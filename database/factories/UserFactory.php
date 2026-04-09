@@ -56,4 +56,27 @@ class UserFactory extends Factory
             'two_factor_confirmed_at' => null,
         ]);
     }
+
+    /**
+     * Indicate that the user is an admin.
+     * Note: This state assumes an 'is_admin' column exists on the users table.
+     * If not, create a migration to add it first.
+     */
+    public function admin(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'is_admin' => true,
+        ]);
+    }
+
+    /**
+     * Indicate that the user is verified and has two-factor disabled.
+     * Useful for quick, standard test user creation.
+     */
+    public function verified(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'email_verified_at' => now(),
+        ])->withoutTwoFactor();
+    }
 }

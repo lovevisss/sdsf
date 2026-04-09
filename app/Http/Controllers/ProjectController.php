@@ -30,12 +30,12 @@ class ProjectController extends Controller
     public function store(Request $request)
     {
         $validated = $request->validate([
-            'title' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
             'description' => 'required|string',
         ]);
 
         Project::create([
-            'title' => $validated['title'],
+            'name' => $validated['name'],
             'description' => $validated['description'],
         ]);
 

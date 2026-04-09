@@ -22,6 +22,10 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'is_admin',
+        'role',
+        'department_id',
+        'student_id',
     ];
 
     /**
@@ -37,6 +41,54 @@ class User extends Authenticatable
     ];
 
     /**
+     * Get the department this user belongs to.
+     */
+    public function department()
+    {
+        return $this->belongsTo(Department::class);
+    }
+
+    /**
+     * Get all conversation appointments initiated by this student.
+     */
+    public function initiatedAppointments()
+    {
+        return $this->hasMany(ConversationAppointment::class, 'student_id');
+    }
+
+    /**
+     * Get all conversation appointments for this advisor.
+     */
+    public function advisorAppointments()
+    {
+        return $this->hasMany(ConversationAppointment::class, 'advisor_id');
+    }
+
+    /**
+     * Get all conversation records conducted by this advisor.
+     */
+    public function conductedConversations()
+    {
+        return $this->hasMany(ConversationRecord::class, 'advisor_id');
+    }
+
+    /**
+     * Get all conversation records this student participated in.
+     */
+    public function conversationRecords()
+    {
+        return $this->hasMany(ConversationRecord::class, 'student_id');
+    }
+
+    /**
+     * Get all posts created by the user.
+     */
+    public function posts()
+    {
+        return $this->hasMany(Post::class);
+    }
+
+    /**
      * Get the attributes that should be cast.
      *
      * @return array<string, string>
@@ -47,6 +99,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
+            'is_admin' => 'boolean',
         ];
     }
 }
