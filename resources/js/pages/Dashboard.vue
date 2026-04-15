@@ -34,6 +34,20 @@ const breadcrumbs: BreadcrumbItem[] = [
                     </Link>
                 </div>
             </div>
+            <div class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
+                <div class="flex items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-base font-semibold">师德师风</h2>
+                        <p class="text-sm text-muted-foreground">快速进入师德师风页面</p>
+                    </div>
+                    <Link
+                        href="/ethics/dashboard"
+                        class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                    >
+                        进入管理
+                    </Link>
+                </div>
+            </div>
 
             <div class="grid auto-rows-min gap-4 md:grid-cols-3">
                 <div

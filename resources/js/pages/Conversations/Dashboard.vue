@@ -29,7 +29,7 @@
                   年度谈话次数
                 </dt>
                 <dd class="text-lg font-medium text-gray-900 dark:text-white">
-                  {{ stats.yearlyCount }}
+                  {{ props.stats.yearlyCount }}
                 </dd>
               </dl>
             </div>
@@ -50,7 +50,7 @@
                   待确认约谈
                 </dt>
                 <dd class="text-lg font-medium text-gray-900 dark:text-white">
-                  {{ stats.pendingAppointments }}
+                  {{ props.stats.pendingAppointments }}
                 </dd>
               </dl>
             </div>
@@ -71,7 +71,7 @@
                   待登记谈话
                 </dt>
                 <dd class="text-lg font-medium text-gray-900 dark:text-white">
-                  {{ stats.pendingRecords }}
+                  {{ props.stats.pendingRecords }}
                 </dd>
               </dl>
             </div>
@@ -92,7 +92,7 @@
                   最多主题
                 </dt>
                 <dd class="text-lg font-medium text-gray-900 dark:text-white truncate">
-                  {{ stats.topTopic }}
+                  {{ props.stats.topTopic }}
                 </dd>
               </dl>
             </div>
@@ -108,14 +108,14 @@
             谈话主题分布
           </h3>
           <div class="space-y-3">
-            <div v-for="item in charts.topicDistribution" :key="item.topic" class="flex items-center">
+            <div v-for="item in props.charts.topicDistribution" :key="item.topic" class="flex items-center">
               <span class="text-sm font-medium text-gray-700 dark:text-gray-300 w-24">
                 {{ item.topic }}
               </span>
               <div class="ml-3 flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                 <div
                   class="bg-blue-600 h-2 rounded-full"
-                  :style="{ width: calculatePercentage(item.count, charts.topicDistribution) + '%' }"
+                  :style="{ width: calculatePercentage(item.count, props.charts.topicDistribution) + '%' }"
                 />
               </div>
               <span class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -131,14 +131,14 @@
             谈话方式分布
           </h3>
           <div class="space-y-3">
-            <div v-for="item in charts.methodDistribution" :key="item.conversation_method" class="flex items-center">
+            <div v-for="item in props.charts.methodDistribution" :key="item.conversation_method" class="flex items-center">
               <span class="text-sm font-medium text-gray-700 dark:text-gray-300 w-32">
                 {{ formatMethod(item.conversation_method) }}
               </span>
               <div class="ml-3 flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2">
                 <div
                   class="bg-green-600 h-2 rounded-full"
-                  :style="{ width: calculatePercentage(item.count, charts.methodDistribution) + '%' }"
+                  :style="{ width: calculatePercentage(item.count, props.charts.methodDistribution) + '%' }"
                 />
               </div>
               <span class="ml-3 text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -156,13 +156,13 @@
         </h3>
         <div class="flex items-end justify-between h-64 gap-2">
           <div
-            v-for="item in charts.monthlyTrend"
+            v-for="item in props.charts.monthlyTrend"
             :key="item.month"
             class="flex-1 flex flex-col items-center"
           >
             <div
               class="w-full bg-blue-600 rounded-t"
-              :style="{ height: calculatePercentage(item.count, charts.monthlyTrend) + '%' }"
+              :style="{ height: calculatePercentage(item.count, props.charts.monthlyTrend) + '%' }"
             />
             <span class="text-xs text-gray-600 dark:text-gray-400 mt-2">
               {{ item.month }}月
@@ -174,14 +174,14 @@
       <!-- Quick Actions -->
       <div class="mt-8 flex flex-wrap gap-4">
         <Link
-          v-if="$page.props.auth.user.role === 'advisor'"
+          v-if="isAdvisor"
           href="/conversations/appointments"
           class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 dark:hover:bg-blue-500"
         >
           管理约谈
         </Link>
         <Link
-          v-if="$page.props.auth.user.role === 'advisor'"
+          v-if="isAdvisor"
           href="/conversations/records/create"
           class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 dark:hover:bg-green-500"
         >
@@ -199,16 +199,20 @@
   </AppLayout>
 </template>
 
-<script setup>
+<script setup lang="js">
 import AppLayout from '@/layouts/AppLayout.vue'
-import { Head, Link } from '@inertiajs/vue3'
+import { Head, Link, usePage } from '@inertiajs/vue3'
 
-defineProps({
+const props = defineProps({
   stats: Object,
   charts: Object,
 })
 
+const page = usePage()
+const isAdvisor = page.props.auth.user?.role === 'advisor'
+
 const formatMethod = (method) => {
+  /** @type {Record<string, string>} */
   const methods = {
     'one_on_one': '一对一谈话',
     'one_on_many': '一对多谈话',
@@ -220,7 +224,7 @@ const formatMethod = (method) => {
 }
 
 const calculatePercentage = (value, array) => {
-  const max = Math.max(...array.map(item => item.count))
+  const max = Math.max(...array.map((item) => item.count), 1)
   return (value / max) * 100
 }
 </script>

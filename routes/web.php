@@ -2,6 +2,9 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Http\Controllers\ScoreController;
+use App\Http\Controllers\ViolationController;
+use App\Http\Controllers\AlertController;
 use Laravel\Fortify\Features;
 
 Route::get('/', function () {
@@ -14,12 +17,21 @@ Route::get('/test',function(){
     return Inertia::render('Test');
 });
 
-Route::get('testing/create/{model}', function($model){
+Route::get('testing/create/{model}', function ($model) {
     $modelClass = 'App\\Models\\' . ucfirst($model);
+
+    if (! class_exists($modelClass) || ! is_subclass_of($modelClass, \Illuminate\Database\Eloquent\Model::class)) {
+        abort(404);
+    }
+
+    if (! method_exists($modelClass, 'factory')) {
+        abort(400, 'Model factory is not available.');
+    }
+
     return $modelClass::factory()->create();
 });
 
-ROute::get('/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'show']);
+Route::get('/tasks/{task}', [\App\Http\Controllers\TaskController::class, 'show']);
 
 Route::get('projects/create', [App\Http\Controllers\ProjectController::class, 'create'])->name('projects.create');
 
@@ -44,8 +56,45 @@ Route::middleware('auth')->group(function () {
     Route::delete('/comments/{comment}', [\App\Http\Controllers\PostCommentController::class, 'destroy']);
 });
 
-// Conversation system routes
+// 师德师风模块
 Route::middleware('auth')->group(function () {
+    Route::apiResource('ethics/scores', \App\Http\Controllers\ScoreController::class);
+    Route::apiResource('ethics/violations', \App\Http\Controllers\ViolationController::class);
+    Route::apiResource('ethics/alerts', \App\Http\Controllers\AlertController::class);
+});
+Route::middleware('auth')->group(function () {
+    Route::get('/ethics/dashboard', [\App\Http\Controllers\EthicsDashboardController::class, 'index'])
+        ->name('ethics.dashboard');
+    Route::get('/ethics/profiles', [\App\Http\Controllers\EthicProfileController::class, 'index'])
+        ->name('ethics.profiles.index');
+    Route::get('/ethics/profiles/{user}', [\App\Http\Controllers\EthicProfileController::class, 'show'])
+        ->name('ethics.profiles.show');
+
+    // Legacy endpoint retained to avoid breaking previous links.
+    Route::get('/ethics/profile/{id}', [\App\Http\Controllers\EthicProfileController::class, 'legacyShow'])
+        ->whereNumber('id')
+        ->name('ethics.profile.legacy');
+
+    Route::get('/ethics/cases', [\App\Http\Controllers\EthicsCaseController::class, 'index'])
+        ->name('ethics.cases.index');
+    Route::post('/ethics/cases', [\App\Http\Controllers\EthicsCaseController::class, 'store'])
+        ->name('ethics.cases.store');
+    Route::patch('/ethics/cases/{case}/status', [\App\Http\Controllers\EthicsCaseController::class, 'updateStatus'])
+        ->name('ethics.cases.update-status');
+    Route::post('/ethics/cases/{case}/actions', [\App\Http\Controllers\EthicsCaseController::class, 'storeAction'])
+        ->name('ethics.cases.store-action');
+
+    Route::post('/ethics/warnings', [\App\Http\Controllers\EthicsWarningController::class, 'store'])
+        ->name('ethics.warnings.store');
+    Route::patch('/ethics/warnings/{warning}/close', [\App\Http\Controllers\EthicsWarningController::class, 'close'])
+        ->name('ethics.warnings.close');
+
+    Route::get('/ethics/political-violations', [\App\Http\Controllers\EthicsPoliticalViolationController::class, 'index'])
+        ->name('ethics.political-violations.index');
+    Route::post('/ethics/political-violations', [\App\Http\Controllers\EthicsPoliticalViolationController::class, 'store'])
+        ->name('ethics.political-violations.store');
+
+
     // Dashboard
     Route::get('/conversations/dashboard', [\App\Http\Controllers\ConversationDashboardController::class, 'index'])
         ->name('conversations.dashboard');

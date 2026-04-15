@@ -30,6 +30,20 @@ return [
     */
 
     'connections' => [
+        // 教职工基础信息只读库
+        'staff_db' => [
+            'driver' => 'mysql',
+            'host' => env('STAFF_DB_HOST', '127.0.0.1'),
+            'port' => env('STAFF_DB_PORT', '3306'),
+            'database' => env('STAFF_DB_DATABASE', 'staff'),
+            'username' => env('STAFF_DB_USERNAME', 'readonly'),
+            'password' => env('STAFF_DB_PASSWORD', ''),
+            'charset' => 'utf8mb4',
+            'collation' => 'utf8mb4_unicode_ci',
+            'prefix' => '',
+            'strict' => true,
+        ],
+
 
         'sqlite' => [
             'driver' => 'sqlite',

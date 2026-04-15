@@ -85,7 +85,7 @@ class ConversationRecordController extends Controller
             'conversation_reason' => 'required|in:academic,life,psychology,discipline,other',
             'topic' => 'required|string|max:255',
             'content' => 'nullable|string',
-            'conversation_at' => 'required|date_time',
+            'conversation_at' => 'required|date',
             'location' => 'nullable|string|max:255',
         ]);
 
@@ -135,7 +135,7 @@ class ConversationRecordController extends Controller
             'conversation_reason' => 'required|in:academic,life,psychology,discipline,other',
             'topic' => 'required|string|max:255',
             'content' => 'nullable|string',
-            'conversation_at' => 'required|date_time',
+            'conversation_at' => 'required|date',
             'location' => 'nullable|string|max:255',
         ]);
 

@@ -65,10 +65,15 @@ class ConversationDashboardController extends Controller
             ->get();
 
         // Monthly trend
-        $monthlyTrend = (clone $recordQuery)->selectRaw('MONTH(conversation_at) as month, COUNT(*) as count')
+        $monthExpression = DB::connection()->getDriverName() === 'sqlite'
+            ? "CAST(strftime('%m', conversation_at) AS INTEGER)"
+            : 'MONTH(conversation_at)';
+
+        $monthlyTrend = (clone $recordQuery)
+            ->selectRaw($monthExpression.' as month, COUNT(*) as count')
             ->whereYear('conversation_at', $year)
-            ->groupBy(DB::raw('MONTH(conversation_at)'))
-            ->orderBy(DB::raw('MONTH(conversation_at)'))
+            ->groupBy(DB::raw($monthExpression))
+            ->orderBy(DB::raw($monthExpression))
             ->get();
 
         // Method distribution

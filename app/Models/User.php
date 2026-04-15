@@ -4,6 +4,8 @@ namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
@@ -86,6 +88,31 @@ class User extends Authenticatable
     public function posts()
     {
         return $this->hasMany(Post::class);
+    }
+
+    public function ethicsProfile(): HasOne
+    {
+        return $this->hasOne(EthicsProfile::class);
+    }
+
+    public function reportedEthicsCases(): HasMany
+    {
+        return $this->hasMany(EthicsCase::class, 'reporter_id');
+    }
+
+    public function assignedEthicsWarnings(): HasMany
+    {
+        return $this->hasMany(EthicsWarning::class, 'assignee_id');
+    }
+
+    public function politicalViolations(): HasMany
+    {
+        return $this->hasMany(EthicsPoliticalViolation::class, 'violator_user_id');
+    }
+
+    public function recordedPoliticalViolations(): HasMany
+    {
+        return $this->hasMany(EthicsPoliticalViolation::class, 'recorder_user_id');
     }
 
     /**

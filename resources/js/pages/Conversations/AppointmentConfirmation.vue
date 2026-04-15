@@ -18,35 +18,35 @@
         <Link
           :href="`/conversations/appointments?status=pending`"
           :class="{
-            'px-4 py-2 rounded-lg font-medium text-white bg-yellow-600 hover:bg-yellow-700': currentStatus === 'pending',
-            'px-4 py-2 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700': currentStatus !== 'pending',
+            'px-4 py-2 rounded-lg font-medium text-white bg-yellow-600 hover:bg-yellow-700': props.currentStatus === 'pending',
+            'px-4 py-2 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700': props.currentStatus !== 'pending',
           }"
         >
-          待确认 ({{ statusCounts.pending }})
+          待确认 ({{ props.statusCounts.pending }})
         </Link>
         <Link
           :href="`/conversations/appointments?status=confirmed`"
           :class="{
-            'px-4 py-2 rounded-lg font-medium text-white bg-blue-600 hover:bg-blue-700': currentStatus === 'confirmed',
-            'px-4 py-2 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700': currentStatus !== 'confirmed',
+            'px-4 py-2 rounded-lg font-medium text-white bg-blue-600 hover:bg-blue-700': props.currentStatus === 'confirmed',
+            'px-4 py-2 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700': props.currentStatus !== 'confirmed',
           }"
         >
-          已确认 ({{ statusCounts.confirmed }})
+          已确认 ({{ props.statusCounts.confirmed }})
         </Link>
         <Link
           :href="`/conversations/appointments?status=completed`"
           :class="{
-            'px-4 py-2 rounded-lg font-medium text-white bg-green-600 hover:bg-green-700': currentStatus === 'completed',
-            'px-4 py-2 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700': currentStatus !== 'completed',
+            'px-4 py-2 rounded-lg font-medium text-white bg-green-600 hover:bg-green-700': props.currentStatus === 'completed',
+            'px-4 py-2 rounded-lg font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700': props.currentStatus !== 'completed',
           }"
         >
-          已完成 ({{ statusCounts.completed }})
+          已完成 ({{ props.statusCounts.completed }})
         </Link>
       </div>
 
       <!-- Appointments List -->
       <div class="bg-white dark:bg-gray-800 shadow rounded-lg overflow-hidden">
-        <div v-if="appointments.data.length === 0" class="p-6 text-center">
+        <div v-if="props.appointments.data.length === 0" class="p-6 text-center">
           <p class="text-gray-600 dark:text-gray-400">
             暂无约谈申请
           </p>
@@ -54,7 +54,7 @@
 
         <div v-else class="divide-y divide-gray-200 dark:divide-gray-700">
           <div
-            v-for="appointment in appointments.data"
+            v-for="appointment in props.appointments.data"
             :key="appointment.id"
             class="p-6 hover:bg-gray-50 dark:hover:bg-gray-700 transition"
           >
@@ -125,8 +125,8 @@
       </div>
 
       <!-- Pagination -->
-      <div v-if="appointments.links" class="mt-6 flex justify-center gap-2">
-        <template v-for="link in appointments.links" :key="link.label">
+      <div v-if="props.appointments.links" class="mt-6 flex justify-center gap-2">
+        <template v-for="link in props.appointments.links" :key="link.label">
           <Link
             v-if="link.url"
             :href="link.url"
@@ -134,8 +134,9 @@
             :class="link.active
               ? 'bg-blue-600 text-white border-blue-600'
               : 'bg-white text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-700'"
-            v-html="link.label"
-          />
+          >
+            <span v-html="link.label" />
+          </Link>
           <span
             v-else
             class="px-4 py-2 rounded border text-sm font-medium bg-gray-100 text-gray-400 dark:bg-gray-700 dark:text-gray-500 border-gray-300 dark:border-gray-600 cursor-not-allowed"
@@ -148,17 +149,18 @@
   </AppLayout>
 </template>
 
-<script setup>
+<script setup lang="js">
 import AppLayout from '@/layouts/AppLayout.vue'
 import { Head, Link, router } from '@inertiajs/vue3'
 
-defineProps({
+const props = defineProps({
   appointments: Object,
   currentStatus: String,
   statusCounts: Object,
 })
 
 const formatStatus = (status) => {
+  /** @type {Record<string, string>} */
   const statuses = {
     'pending': '待确认',
     'confirmed': '已确认',
@@ -169,6 +171,7 @@ const formatStatus = (status) => {
 }
 
 const formatType = (type) => {
+  /** @type {Record<string, string>} */
   const types = {
     'talk': '谈心',
     'consultation': '咨询',
