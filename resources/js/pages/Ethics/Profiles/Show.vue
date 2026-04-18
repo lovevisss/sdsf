@@ -8,7 +8,7 @@
           <Link href="/ethics/profiles" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">返回列表</Link>
         </div>
 
-        <div class="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
           <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
             <p class="text-sm text-gray-500 dark:text-gray-400">近十次考核记录</p>
             <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ props.summary.assessmentCount }}</p>
@@ -20,6 +20,16 @@
           <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
             <p class="text-sm text-gray-500 dark:text-gray-400">近十次投诉记录</p>
             <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ props.summary.caseCount }}</p>
+          </div>
+          <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
+            <p class="text-sm text-gray-500 dark:text-gray-400">思政素养{{ props.summary.year }}年扣分</p>
+            <p class="mt-2 text-2xl font-semibold text-red-600 dark:text-red-400">{{ props.summary.politicalAnnualDeductionTotal }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">剩余{{ props.summary.politicalAnnualRemainingScore }} / 25</p>
+          </div>
+          <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
+            <p class="text-sm text-gray-500 dark:text-gray-400">教育教学{{ props.summary.year }}年扣分</p>
+            <p class="mt-2 text-2xl font-semibold text-red-600 dark:text-red-400">{{ props.summary.educationAnnualDeductionTotal }}</p>
+            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">剩余{{ props.summary.educationAnnualRemainingScore }} / 25</p>
           </div>
         </div>
 
@@ -72,9 +82,14 @@ import { Head, Link } from '@inertiajs/vue3'
 const props = defineProps<{
   profile: Record<string, any>
   summary: {
+    year: number
     assessmentCount: number
     openWarningCount: number
     caseCount: number
+    politicalAnnualDeductionTotal: number
+    politicalAnnualRemainingScore: number
+    educationAnnualDeductionTotal: number
+    educationAnnualRemainingScore: number
   }
 }>()
 

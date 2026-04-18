@@ -39,6 +39,8 @@ defineProps<{
             v-slot="{ errors, processing }"
             class="flex flex-col gap-6"
         >
+            <InputError :message="errors.cas" />
+
             <div class="grid gap-6">
                 <div class="grid gap-2">
                     <Label for="email">Email address</Label>
@@ -95,6 +97,10 @@ defineProps<{
                 >
                     <Spinner v-if="processing" />
                     Log in
+                </Button>
+
+                <Button type="button" variant="outline" class="w-full" as-child>
+                    <a href="/auth/cas/redirect">Sign in with Campus CAS</a>
                 </Button>
             </div>
 

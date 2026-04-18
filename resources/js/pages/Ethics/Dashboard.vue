@@ -29,8 +29,20 @@
             <p class="text-sm text-gray-500 dark:text-gray-400">思想政治素养（25分）年度扣分概况</p>
             <div class="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-700 dark:text-gray-300">
               <span>违规记录: <strong>{{ props.stats.politicalViolationCount }}</strong></span>
-              <span>累计扣分: <strong>{{ props.stats.politicalDeductionTotal }}</strong></span>
-              <span>剩余分值: <strong>{{ props.stats.politicalRemainingScore }}</strong></span>
+              <span>当前人员扣分: <strong>{{ props.stats.politicalSelectedDeductionTotal }}</strong></span>
+              <span>当前人员剩余: <strong>{{ props.stats.politicalSelectedRemainingScore }}</strong></span>
+            </div>
+            <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+              年度：{{ props.stats.year }}，当前人员：{{ props.stats.selectedStaffNo ?? '未选择（可在登记页选择后返回）' }}
+            </p>
+          </div>
+
+          <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800 sm:col-span-2 lg:col-span-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">教育教学行为（25分）年度扣分概况</p>
+            <div class="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-700 dark:text-gray-300">
+              <span>违规记录: <strong>{{ props.stats.educationViolationCount }}</strong></span>
+              <span>当前人员扣分: <strong>{{ props.stats.educationSelectedDeductionTotal }}</strong></span>
+              <span>当前人员剩余: <strong>{{ props.stats.educationSelectedRemainingScore }}</strong></span>
             </div>
           </div>
         </div>
@@ -39,6 +51,7 @@
           <Link href="/ethics/profiles" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700">查看一人一档</Link>
           <Link href="/ethics/cases" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">查看投诉闭环</Link>
           <Link href="/ethics/political-violations" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">手工登记思政违规</Link>
+          <Link href="/ethics/education-violations" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">手工登记教育教学违规</Link>
         </div>
 
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -102,13 +115,18 @@ type WarningItem = {
 
 const props = defineProps<{
   stats: {
+    year: number
+    selectedStaffNo?: string | null
     profileCount: number
     openCaseCount: number
     highRiskCaseCount: number
     openWarningCount: number
     politicalViolationCount: number
-    politicalDeductionTotal: number
-    politicalRemainingScore: number
+    politicalSelectedDeductionTotal: number
+    politicalSelectedRemainingScore: number
+    educationViolationCount: number
+    educationSelectedDeductionTotal: number
+    educationSelectedRemainingScore: number
   }
   recentCases: CaseItem[]
   recentWarnings: WarningItem[]

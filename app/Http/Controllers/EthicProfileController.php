@@ -48,6 +48,8 @@ class EthicProfileController extends Controller
 
     public function show(Request $request, User $user)
     {
+        $year = (int) $request->query('year', now()->year);
+
         $profile = EthicsProfile::query()->firstOrCreate(
             ['user_id' => $user->id],
             [
@@ -68,12 +70,25 @@ class EthicProfileController extends Controller
             'cases' => fn ($query) => $query->latest('reported_at')->limit(10),
         ]);
 
+        $politicalAnnualDeductionTotal = (float) $profile->politicalViolations()
+            ->whereYear('violation_at', $year)
+            ->sum('deduction_points');
+
+        $educationAnnualDeductionTotal = (float) $profile->educationViolations()
+            ->whereYear('violation_at', $year)
+            ->sum('deduction_points');
+
         return Inertia::render('Ethics/Profiles/Show', [
             'profile' => $profile,
             'summary' => [
+                'year' => $year,
                 'assessmentCount' => $profile->assessments->count(),
                 'openWarningCount' => $profile->warnings->where('status', '!=', 'closed')->count(),
                 'caseCount' => $profile->cases->count(),
+                'politicalAnnualDeductionTotal' => round($politicalAnnualDeductionTotal, 2),
+                'politicalAnnualRemainingScore' => max(0, round(25 - $politicalAnnualDeductionTotal, 2)),
+                'educationAnnualDeductionTotal' => round($educationAnnualDeductionTotal, 2),
+                'educationAnnualRemainingScore' => max(0, round(25 - $educationAnnualDeductionTotal, 2)),
             ],
         ]);
     }
@@ -83,7 +98,7 @@ class EthicProfileController extends Controller
         $user = User::query()->findOrFail((int) $id);
 
         return $this->show(request(), $user);
-    
+
 
     } // End legacyShow
 

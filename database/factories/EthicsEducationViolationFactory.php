@@ -2,17 +2,17 @@
 
 namespace Database\Factories;
 
-use App\Models\EthicsPoliticalViolation;
+use App\Models\EthicsEducationViolation;
 use App\Models\EthicsProfile;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
- * @extends Factory<EthicsPoliticalViolation>
+ * @extends Factory<EthicsEducationViolation>
  */
-class EthicsPoliticalViolationFactory extends Factory
+class EthicsEducationViolationFactory extends Factory
 {
-    protected $model = EthicsPoliticalViolation::class;
+    protected $model = EthicsEducationViolation::class;
 
     public function definition(): array
     {
@@ -23,7 +23,7 @@ class EthicsPoliticalViolationFactory extends Factory
             'staff_no' => 'T'.$this->faker->unique()->numberBetween(1000, 9999),
             'staff_name' => $this->faker->name(),
             'staff_unit_name' => $this->faker->word().'学院',
-            'violation_type' => $this->faker->numberBetween(1, 7),
+            'violation_type' => $this->faker->numberBetween(8, 15),
             'violation_at' => now()->subDays($this->faker->numberBetween(0, 90)),
             'deduction_points' => $this->faker->randomFloat(2, 0.5, 8),
             'notes' => $this->faker->sentence(),

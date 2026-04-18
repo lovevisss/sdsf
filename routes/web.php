@@ -5,6 +5,7 @@ use Inertia\Inertia;
 use App\Http\Controllers\ScoreController;
 use App\Http\Controllers\ViolationController;
 use App\Http\Controllers\AlertController;
+use App\Http\Controllers\CasController;
 use Laravel\Fortify\Features;
 
 Route::get('/', function () {
@@ -16,6 +17,16 @@ Route::get('/', function () {
 Route::get('/test',function(){
     return Inertia::render('Test');
 });
+
+Route::get('/auth/cas/redirect', [CasController::class, 'redirect'])
+    ->middleware('guest')
+    ->name('cas.redirect');
+Route::get('/auth/cas/callback', [CasController::class, 'callback'])
+    ->middleware('guest')
+    ->name('cas.callback');
+Route::get('/auth/cas/logout', [CasController::class, 'logout'])
+    ->middleware('auth')
+    ->name('cas.logout');
 
 Route::get('testing/create/{model}', function ($model) {
     $modelClass = 'App\\Models\\' . ucfirst($model);
@@ -60,6 +71,10 @@ Route::middleware('auth')->group(function () {
 Route::middleware('auth')->group(function () {
     Route::apiResource('ethics/scores', \App\Http\Controllers\ScoreController::class);
     Route::apiResource('ethics/violations', \App\Http\Controllers\ViolationController::class);
+    Route::get('/ethics/education-violations', [\App\Http\Controllers\EducationViolationController::class, 'index'])
+        ->name('ethics.education-violations.index');
+    Route::post('/ethics/education-violations', [\App\Http\Controllers\EducationViolationController::class, 'store'])
+        ->name('ethics.education-violations.store');
     Route::apiResource('ethics/alerts', \App\Http\Controllers\AlertController::class);
 });
 Route::middleware('auth')->group(function () {
