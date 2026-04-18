@@ -82,6 +82,8 @@ Route::middleware('auth')->group(function () {
         ->name('ethics.dashboard');
     Route::get('/ethics/profiles', [\App\Http\Controllers\EthicProfileController::class, 'index'])
         ->name('ethics.profiles.index');
+    Route::get('/ethics/profiles/staff/{staffNo}', [\App\Http\Controllers\EthicProfileController::class, 'showByStaff'])
+        ->name('ethics.profiles.staff.show');
     Route::get('/ethics/profiles/{user}', [\App\Http\Controllers\EthicProfileController::class, 'show'])
         ->name('ethics.profiles.show');
 

@@ -28,6 +28,7 @@ class Staff extends Model
         'sflx',
         'sjh',
         'zt',
+        'szdwbm'
     ];
 
     protected static function booted(): void

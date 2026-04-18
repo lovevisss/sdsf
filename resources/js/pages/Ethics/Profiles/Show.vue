@@ -10,65 +10,70 @@
 
         <div class="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-5">
           <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
-            <p class="text-sm text-gray-500 dark:text-gray-400">近十次考核记录</p>
-            <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ props.summary.assessmentCount }}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">思想政治素养（25分）</p>
+            <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ props.summary.modules.political }}</p>
           </div>
           <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
-            <p class="text-sm text-gray-500 dark:text-gray-400">未销号预警</p>
-            <p class="mt-2 text-2xl font-semibold text-yellow-600 dark:text-yellow-400">{{ props.summary.openWarningCount }}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">教育教学行为（25分）</p>
+            <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ props.summary.modules.education }}</p>
           </div>
           <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
-            <p class="text-sm text-gray-500 dark:text-gray-400">近十次投诉记录</p>
-            <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ props.summary.caseCount }}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">学术诚信（25分）</p>
+            <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ props.summary.modules.academic }}</p>
           </div>
           <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
-            <p class="text-sm text-gray-500 dark:text-gray-400">思政素养{{ props.summary.year }}年扣分</p>
-            <p class="mt-2 text-2xl font-semibold text-red-600 dark:text-red-400">{{ props.summary.politicalAnnualDeductionTotal }}</p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">剩余{{ props.summary.politicalAnnualRemainingScore }} / 25</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">为人师表（25分）</p>
+            <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ props.summary.modules.professional }}</p>
           </div>
           <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
-            <p class="text-sm text-gray-500 dark:text-gray-400">教育教学{{ props.summary.year }}年扣分</p>
-            <p class="mt-2 text-2xl font-semibold text-red-600 dark:text-red-400">{{ props.summary.educationAnnualDeductionTotal }}</p>
-            <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">剩余{{ props.summary.educationAnnualRemainingScore }} / 25</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">年度总分（100分）</p>
+            <p class="mt-2 text-2xl font-semibold text-blue-600 dark:text-blue-400">{{ props.summary.totalScore }}</p>
           </div>
         </div>
 
         <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
           <h2 class="text-lg font-semibold text-gray-900 dark:text-white">基础信息</h2>
           <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            <p class="text-sm text-gray-700 dark:text-gray-300">姓名：{{ props.profile.user?.name }}</p>
-            <p class="text-sm text-gray-700 dark:text-gray-300">邮箱：{{ props.profile.user?.email }}</p>
-            <p class="text-sm text-gray-700 dark:text-gray-300">角色：{{ props.profile.user?.role }}</p>
-            <p class="text-sm text-gray-700 dark:text-gray-300">部门：{{ props.profile.department?.name ?? '-' }}</p>
-            <p class="text-sm text-gray-700 dark:text-gray-300">岗位：{{ props.profile.position ?? '-' }}</p>
-            <p class="text-sm text-gray-700 dark:text-gray-300">身份类型：{{ props.profile.identity_type ?? '-' }}</p>
-            <p class="text-sm text-gray-700 dark:text-gray-300">入职时间：{{ formatDate(props.profile.hired_at) }}</p>
-            <p class="text-sm text-gray-700 dark:text-gray-300">档案状态：{{ props.profile.status }}</p>
+            <p class="text-sm text-gray-700 dark:text-gray-300">工号：{{ props.profile.staff_no }}</p>
+            <p class="text-sm text-gray-700 dark:text-gray-300">姓名：{{ props.profile.name ?? '-' }}</p>
+            <p class="text-sm text-gray-700 dark:text-gray-300">部门：{{ props.profile.unit_name ?? '-' }}</p>
+            <p class="text-sm text-gray-700 dark:text-gray-300">年份：{{ props.summary.year }}</p>
+            <p class="text-sm text-gray-700 dark:text-gray-300">思政年度扣分：{{ props.summary.politicalAnnualDeductionTotal }}</p>
+            <p class="text-sm text-gray-700 dark:text-gray-300">教育教学年度扣分：{{ props.summary.educationAnnualDeductionTotal }}</p>
+            <p class="text-sm text-gray-700 dark:text-gray-300">教师评价平均分：{{ props.summary.teacherEvaluationAverage }}</p>
+            <p class="text-sm text-gray-700 dark:text-gray-300">教师评价后10%触发次数：{{ props.summary.automaticLowEvaluationCount }}</p>
           </div>
         </div>
 
-        <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">预警记录</h3>
-            <div class="mt-4 space-y-3">
-              <div v-if="props.profile.warnings.length === 0" class="text-sm text-gray-500 dark:text-gray-400">暂无预警记录</div>
-              <div v-for="item in props.profile.warnings" :key="item.id" class="rounded-md border border-gray-200 p-3 dark:border-gray-700">
-                <p class="text-sm text-gray-700 dark:text-gray-300">{{ item.warning_level }} / {{ item.source_type }} / {{ item.status }}</p>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ item.reason }}</p>
-              </div>
-            </div>
+        <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
+          <div class="border-b border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300">
+            历年信息（按年份倒序）
           </div>
-
-          <div class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
-            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">投诉记录</h3>
-            <div class="mt-4 space-y-3">
-              <div v-if="props.profile.cases.length === 0" class="text-sm text-gray-500 dark:text-gray-400">暂无投诉记录</div>
-              <div v-for="item in props.profile.cases" :key="item.id" class="rounded-md border border-gray-200 p-3 dark:border-gray-700">
-                <p class="text-sm font-medium text-gray-700 dark:text-gray-300">{{ item.title }}</p>
-                <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ item.status }} / {{ item.risk_level }}</p>
-              </div>
-            </div>
-          </div>
+          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-900">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">年份</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">思政扣分</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">教育教学扣分</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">教师评价均分</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">后10%触发次数</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">年度总分</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+              <tr v-if="props.yearlySummaries.length === 0">
+                <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">暂无历年数据</td>
+              </tr>
+              <tr v-for="item in props.yearlySummaries" :key="item.year">
+                <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">{{ item.year }}</td>
+                <td class="px-4 py-3 text-sm text-red-600 dark:text-red-400">{{ item.politicalAnnualDeductionTotal }}</td>
+                <td class="px-4 py-3 text-sm text-red-600 dark:text-red-400">{{ item.educationAnnualDeductionTotal }}</td>
+                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ item.teacherEvaluationAverage }}</td>
+                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ item.automaticLowEvaluationCount }}</td>
+                <td class="px-4 py-3 text-sm text-blue-600 dark:text-blue-400">{{ item.totalScore }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
@@ -80,25 +85,35 @@ import AppLayout from '@/layouts/AppLayout.vue'
 import { Head, Link } from '@inertiajs/vue3'
 
 const props = defineProps<{
-  profile: Record<string, any>
+  profile: {
+    staff_no: string
+    name?: string | null
+    unit_name?: string | null
+  }
   summary: {
     year: number
-    assessmentCount: number
-    openWarningCount: number
-    caseCount: number
     politicalAnnualDeductionTotal: number
     politicalAnnualRemainingScore: number
     educationAnnualDeductionTotal: number
     educationAnnualRemainingScore: number
+    teacherEvaluationAverage: number
+    automaticLowEvaluationCount: number
+    modules: {
+      political: number
+      education: number
+      academic: number
+      professional: number
+    }
+    totalScore: number
   }
+  yearlySummaries: Array<{
+    year: number
+    politicalAnnualDeductionTotal: number
+    educationAnnualDeductionTotal: number
+    teacherEvaluationAverage: number
+    automaticLowEvaluationCount: number
+    totalScore: number
+  }>
 }>()
-
-const formatDate = (value: unknown): string => {
-  if (!value) {
-    return '-'
-  }
-
-  return new Date(value as string | number | Date).toLocaleDateString('zh-CN')
-}
 </script>
 

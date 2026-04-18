@@ -10,6 +10,9 @@ use App\Models\EthicsProfile;
 use App\Models\EthicsWarning;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -71,6 +74,140 @@ class EthicsGovernanceTest extends TestCase
             ->component('Ethics/Profiles/Index')
             ->has('staffRecords.data')
             ->where('staffRecords.current_page', 1)
+        );
+    }
+
+    public function test_archive_department_filter_uses_department_code(): void
+    {
+        $financeDepartment = Department::factory()->create([
+            'name' => 'Finance Department',
+            'code' => 'FIN',
+        ]);
+
+        $itDepartment = Department::factory()->create([
+            'name' => 'IT Department',
+            'code' => 'IT',
+        ]);
+
+        $advisor = User::factory()->withoutTwoFactor()->create([
+            'role' => 'advisor',
+            'department_id' => $financeDepartment->id,
+        ]);
+
+        $financeUser = User::factory()->withoutTwoFactor()->create([
+            'role' => 'advisor',
+            'department_id' => $financeDepartment->id,
+        ]);
+
+        $itUser = User::factory()->withoutTwoFactor()->create([
+            'role' => 'advisor',
+            'department_id' => $itDepartment->id,
+        ]);
+
+        EthicsProfile::factory()->create([
+            'user_id' => $financeUser->id,
+            'department_id' => $financeDepartment->id,
+            'staff_no' => 'FIN-001',
+        ]);
+
+        EthicsProfile::factory()->create([
+            'user_id' => $itUser->id,
+            'department_id' => $itDepartment->id,
+            'staff_no' => 'IT-001',
+        ]);
+
+        $response = $this->actingAs($advisor)->get('/ethics/profiles?department=FIN');
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Ethics/Profiles/Index')
+            ->where('departmentFilter', 'FIN')
+            ->has('departmentOptions', 2)
+            ->where('departmentOptions.0.code', 'FIN')
+            ->where('departmentOptions.0.name', 'Finance Department')
+            ->has('staffRecords.data')
+        );
+    }
+
+    public function test_archive_department_filter_returns_staff_from_staff_db_mapping(): void
+    {
+        $sqlitePath = database_path('staff_filter_test.sqlite');
+
+        if (! file_exists($sqlitePath)) {
+            touch($sqlitePath);
+        }
+
+        config()->set('database.connections.staff_db', [
+            'driver' => 'sqlite',
+            'database' => $sqlitePath,
+            'prefix' => '',
+            'foreign_key_constraints' => false,
+        ]);
+
+        DB::purge('staff_db');
+
+        Schema::connection('staff_db')->dropIfExists('t_ejxyybt_jzgjbxx');
+        Schema::connection('staff_db')->create('t_ejxyybt_jzgjbxx', function (Blueprint $table): void {
+            $table->string('gh')->primary();
+            $table->string('xm')->nullable();
+            $table->string('dwmc')->nullable();
+            $table->string('bmmc')->nullable();
+            $table->string('szdwbm')->nullable();
+            $table->string('gw')->nullable();
+            $table->string('sflx')->nullable();
+            $table->string('sjh')->nullable();
+            $table->string('zt')->nullable();
+        });
+
+        DB::connection('staff_db')->table('t_ejxyybt_jzgjbxx')->insert([
+            [
+                'gh' => 'FIN-STAFF-01',
+                'xm' => 'Finance Teacher',
+                'dwmc' => null,
+                'bmmc' => null,
+                'szdwbm' => ' fin ',
+                'gw' => null,
+                'sflx' => null,
+                'sjh' => null,
+                'zt' => null,
+            ],
+            [
+                'gh' => 'IT-STAFF-01',
+                'xm' => 'IT Teacher',
+                'dwmc' => null,
+                'bmmc' => null,
+                'szdwbm' => 'IT',
+                'gw' => null,
+                'sflx' => null,
+                'sjh' => null,
+                'zt' => null,
+            ],
+        ]);
+
+        $financeDepartment = Department::factory()->create([
+            'name' => 'Finance Department',
+            'code' => 'FIN',
+        ]);
+
+        Department::factory()->create([
+            'name' => 'IT Department',
+            'code' => 'IT',
+        ]);
+
+        $advisor = User::factory()->withoutTwoFactor()->create([
+            'role' => 'advisor',
+            'department_id' => $financeDepartment->id,
+        ]);
+
+        $response = $this->actingAs($advisor)->get('/ethics/profiles?department=FIN');
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Ethics/Profiles/Index')
+            ->where('departmentFilter', 'FIN')
+            ->where('staffRecords.data.0.staff_no', 'FIN-STAFF-01')
+            ->where('staffRecords.data.0.name', 'Finance Teacher')
+            ->has('staffRecords.data', 1)
         );
     }
 
@@ -583,6 +720,9 @@ class EthicsGovernanceTest extends TestCase
             ->where('summary.politicalAnnualRemainingScore', 21)
             ->where('summary.educationAnnualDeductionTotal', 5)
             ->where('summary.educationAnnualRemainingScore', 20)
+            ->has('yearlySummaries', 2)
+            ->where('yearlySummaries.0.year', 2026)
+            ->where('yearlySummaries.1.year', 2025)
         );
     }
 }
