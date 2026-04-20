@@ -20,20 +20,20 @@ const breadcrumbs: BreadcrumbItem[] = [
         <div
             class="flex h-full flex-1 flex-col gap-4 overflow-x-auto rounded-xl p-4"
         >
-            <div class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
-                <div class="flex items-center justify-between gap-4">
-                    <div>
-                        <h2 class="text-base font-semibold">谈心谈话</h2>
-                        <p class="text-sm text-muted-foreground">快速进入约谈确认登记页面</p>
-                    </div>
-                    <Link
-                        href="/conversations/dashboard"
-                        class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
-                    >
-                        管理约谈
-                    </Link>
-                </div>
-            </div>
+<!--            <div class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">-->
+<!--                <div class="flex items-center justify-between gap-4">-->
+<!--                    <div>-->
+<!--                        <h2 class="text-base font-semibold">谈心谈话</h2>-->
+<!--                        <p class="text-sm text-muted-foreground">快速进入约谈确认登记页面</p>-->
+<!--                    </div>-->
+<!--                    <Link-->
+<!--                        href="/conversations/dashboard"-->
+<!--                        class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"-->
+<!--                    >-->
+<!--                        管理约谈-->
+<!--                    </Link>-->
+<!--                </div>-->
+<!--            </div>-->
             <div class="rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border">
                 <div class="flex items-center justify-between gap-4">
                     <div>
