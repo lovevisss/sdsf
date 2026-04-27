@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Ethics\UpsertAnnualDeductionWarning;
 use App\Http\Requests\StoreEthicsPoliticalViolationRequest;
 use App\Models\EthicsPoliticalViolation;
 use App\Models\EthicsProfile;
@@ -14,6 +15,10 @@ use Inertia\Inertia;
 class EthicsPoliticalViolationController extends Controller
 {
     private const MAX_POLITICAL_SCORE = 25.0;
+
+    public function __construct(private readonly UpsertAnnualDeductionWarning $upsertAnnualDeductionWarning)
+    {
+    }
 
     public function index(Request $request)
     {
@@ -59,7 +64,7 @@ class EthicsPoliticalViolationController extends Controller
             ->orderByDesc('total_deduction')
             ->limit(200)
             ->get()
-            ->map(function (EthicsPoliticalViolation $item): array {
+            ->map(function (EthicsPoliticalViolation $item) use ($year): array {
                 $totalDeduction = (float) $item->total_deduction;
 
                 return [
@@ -69,6 +74,7 @@ class EthicsPoliticalViolationController extends Controller
                     'violation_count' => (int) $item->violation_count,
                     'total_deduction' => round($totalDeduction, 2),
                     'remaining_score' => max(0, round(self::MAX_POLITICAL_SCORE - $totalDeduction, 2)),
+                    'profile_url' => route('ethics.profiles.staff.show', ['staffNo' => $item->staff_no, 'year' => $year]),
                 ];
             })
             ->values();
@@ -116,6 +122,10 @@ class EthicsPoliticalViolationController extends Controller
             'violator_user_id' => $profile?->user_id,
             'recorder_user_id' => $request->user()->id,
         ]);
+
+        $violationTimestamp = strtotime((string) $validated['violation_at']);
+        $violationYear = $violationTimestamp !== false ? (int) date('Y', $violationTimestamp) : now()->year;
+        $this->upsertAnnualDeductionWarning->handle((string) $validated['staff_no'], $violationYear);
 
         return redirect()->route('ethics.political-violations.index', [
             'staff_no' => $validated['staff_no'],

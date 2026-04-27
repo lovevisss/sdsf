@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\Ethics\UpsertAnnualDeductionWarning;
 use App\Http\Requests\StoreEthicsEducationViolationRequest;
 use App\Models\EthicsEducationViolation;
 use App\Models\EthicsProfile;
@@ -15,6 +16,10 @@ use Inertia\Response;
 class EducationViolationController extends Controller
 {
     private const MAX_EDUCATION_SCORE = 25.0;
+
+    public function __construct(private readonly UpsertAnnualDeductionWarning $upsertAnnualDeductionWarning)
+    {
+    }
 
     public function index(Request $request): Response
     {
@@ -60,7 +65,7 @@ class EducationViolationController extends Controller
             ->orderByDesc('total_deduction')
             ->limit(200)
             ->get()
-            ->map(function (EthicsEducationViolation $item): array {
+            ->map(function (EthicsEducationViolation $item) use ($year): array {
                 $totalDeduction = (float) $item->total_deduction;
 
                 return [
@@ -70,6 +75,7 @@ class EducationViolationController extends Controller
                     'violation_count' => (int) $item->violation_count,
                     'total_deduction' => round($totalDeduction, 2),
                     'remaining_score' => max(0, round(self::MAX_EDUCATION_SCORE - $totalDeduction, 2)),
+                    'profile_url' => route('ethics.profiles.staff.show', ['staffNo' => $item->staff_no, 'year' => $year]),
                 ];
             })
             ->values();
@@ -117,6 +123,10 @@ class EducationViolationController extends Controller
             'violator_user_id' => $profile?->user_id,
             'recorder_user_id' => $request->user()->id,
         ]);
+
+        $violationTimestamp = strtotime((string) $validated['violation_at']);
+        $violationYear = $violationTimestamp !== false ? (int) date('Y', $violationTimestamp) : now()->year;
+        $this->upsertAnnualDeductionWarning->handle((string) $validated['staff_no'], $violationYear);
 
         return redirect()->route('ethics.education-violations.index', [
             'staff_no' => $validated['staff_no'],

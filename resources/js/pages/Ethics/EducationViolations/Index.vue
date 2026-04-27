@@ -28,6 +28,13 @@
 
         <p class="text-sm text-gray-600 dark:text-gray-400">
           {{ selectedSummary ? `当前查看：${selectedSummary.staff_no} - ${selectedSummary.staff_name}` : '请先搜索并选择一个人员，再查看该人员的25分扣分情况。' }}
+          <Link
+            v-if="selectedSummary?.profile_url"
+            :href="selectedSummary.profile_url"
+            class="ml-2 text-blue-600 hover:underline dark:text-blue-400"
+          >
+            查看历年记录
+          </Link>
         </p>
 
         <div class="rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700 dark:border-blue-700 dark:bg-blue-950/30 dark:text-blue-300">
@@ -107,11 +114,12 @@
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">单位</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">扣分</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">剩余</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">操作</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
               <tr v-if="props.staffSummaries.length === 0">
-                <td colspan="5" class="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">暂无汇总数据</td>
+                <td colspan="6" class="px-4 py-4 text-center text-sm text-gray-500 dark:text-gray-400">暂无汇总数据</td>
               </tr>
               <tr v-for="item in props.staffSummaries" :key="item.staff_no" class="cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700" @click="pickStaffSummary(item)">
                 <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">{{ item.staff_no }}</td>
@@ -119,6 +127,17 @@
                 <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ item.staff_unit_name ?? '-' }}</td>
                 <td class="px-4 py-3 text-sm text-red-600 dark:text-red-400">{{ item.total_deduction }}</td>
                 <td class="px-4 py-3 text-sm text-green-600 dark:text-green-400">{{ item.remaining_score }}</td>
+                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">
+                  <Link
+                    v-if="item.profile_url"
+                    :href="item.profile_url"
+                    class="text-blue-600 hover:underline dark:text-blue-400"
+                    @click.stop
+                  >
+                    查看历年记录
+                  </Link>
+                  <span v-else>-</span>
+                </td>
               </tr>
             </tbody>
           </table>
@@ -187,6 +206,7 @@ type StaffSummary = {
   violation_count: number
   total_deduction: number
   remaining_score: number
+  profile_url?: string
 }
 
 const props = defineProps<{

@@ -71,6 +71,73 @@ class EthicsDashboardController extends Controller
         $politicalSelectedDeductionTotal = (float) $politicalSelectedQuery->sum('deduction_points');
         $educationSelectedDeductionTotal = (float) $educationSelectedQuery->sum('deduction_points');
 
+        $politicalTotals = (clone $politicalViolationQuery)
+            ->selectRaw('staff_no, SUM(deduction_points) as total_deduction')
+            ->groupBy('staff_no')
+            ->pluck('total_deduction', 'staff_no')
+            ->mapWithKeys(fn (mixed $value, mixed $staffNo): array => [
+                (string) $staffNo => (float) $value,
+            ]);
+//        dd($politicalTotals);
+        $educationTotals = (clone $educationViolationQuery)
+            ->selectRaw('staff_no, SUM(deduction_points) as total_deduction')
+            ->groupBy('staff_no')
+            ->pluck('total_deduction', 'staff_no')
+            ->mapWithKeys(fn (mixed $value, mixed $staffNo): array => [
+                (string) $staffNo => (float) $value,
+            ]);
+
+        $allStaffNos = collect([
+            ...array_keys($politicalTotals->all()),
+            ...array_keys($educationTotals->all()),
+        ])->map(fn (mixed $staffNo): string => (string) $staffNo)
+            ->filter(fn (string $staffNo): bool => $staffNo !== '')
+            ->unique()
+            ->values();
+        $profilesByStaffNo = EthicsProfile::query()
+            ->with(['user:id,name'])
+            ->whereIn('staff_no', $allStaffNos)
+            ->get()
+            ->keyBy('staff_no');
+
+        $autoWarningPeople = $allStaffNos
+            ->map(function (string $staffNo) use ($politicalTotals, $educationTotals, $profilesByStaffNo, $year): array {
+                $annualDeduction = round((float) ($politicalTotals->get($staffNo, 0.0) + $educationTotals->get($staffNo, 0.0)), 2);
+
+                $warningLevel = null;
+
+                if ($annualDeduction >= 10) {
+                    $warningLevel = 'red';
+                } elseif ($annualDeduction >= 5) {
+                    $warningLevel = 'yellow';
+                }
+
+                $profile = $profilesByStaffNo->get($staffNo);
+
+                return [
+                    'ethics_profile_id' => $profile?->id,
+                    'staff_no' => $staffNo,
+                    'name' => $profile?->user?->name,
+                    'warning_level' => $warningLevel,
+                    'status' => $warningLevel === null ? null : 'open',
+                    'detected_at' => now(),
+                    'annual_deduction' => $annualDeduction,
+                    'profile_url' => $staffNo !== ''
+                        ? route('ethics.profiles.staff.show', ['staffNo' => $staffNo, 'year' => $year])
+                        : null,
+                ];
+            })
+            ->filter(fn (array $item): bool => in_array($item['warning_level'], ['yellow', 'red'], true))
+            ->sortByDesc('annual_deduction')
+            ->values();
+        $redWarningPeople = $autoWarningPeople
+            ->where('warning_level', 'red')
+            ->values();
+
+        $yellowWarningPeople = $autoWarningPeople
+            ->where('warning_level', 'yellow')
+            ->values();
+
         return Inertia::render('Ethics/Dashboard', [
             'stats' => [
                 'year' => $year,
@@ -85,6 +152,12 @@ class EthicsDashboardController extends Controller
                 'educationViolationCount' => (clone $educationViolationQuery)->count(),
                 'educationSelectedDeductionTotal' => round($educationSelectedDeductionTotal, 2),
                 'educationSelectedRemainingScore' => max(0, round(25 - $educationSelectedDeductionTotal, 2)),
+                'redWarningPersonCount' => $redWarningPeople->count(),
+                'yellowWarningPersonCount' => $yellowWarningPeople->count(),
+            ],
+            'autoWarningPeople' => [
+                'red' => $redWarningPeople,
+                'yellow' => $yellowWarningPeople,
             ],
             'recentCases' => (clone $caseQuery)
                 ->with(['profile.user:id,name'])

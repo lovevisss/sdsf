@@ -3,6 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Actions\Ethics\TeacherEvaluationBottomDecileSelector;
+use App\Actions\Ethics\UpsertAnnualDeductionWarning;
 use App\Models\EthicsEducationViolation;
 use App\Models\EthicsProfile;
 use App\Models\Staff;
@@ -31,7 +32,10 @@ class SyncTeacherEvaluationBottomDecile extends Command
      */
     protected $description = 'Sync yearly bottom 10% teacher evaluations into ethics education violations.';
 
-    public function __construct(private readonly TeacherEvaluationBottomDecileSelector $selector)
+    public function __construct(
+        private readonly TeacherEvaluationBottomDecileSelector $selector,
+        private readonly UpsertAnnualDeductionWarning $upsertAnnualDeductionWarning,
+    )
     {
         parent::__construct();
     }
@@ -211,6 +215,8 @@ class SyncTeacherEvaluationBottomDecile extends Command
                 'notes' => '教师评价后10%',
             ]);
         });
+
+        $this->upsertAnnualDeductionWarning->handle($teacherNo, $violationYear);
 
         return true;
     }

@@ -17,13 +17,25 @@
             <p class="text-sm text-gray-500 dark:text-gray-400">未闭环投诉</p>
             <p class="mt-2 text-2xl font-semibold text-gray-900 dark:text-white">{{ props.stats.openCaseCount }}</p>
           </div>
+<!--          <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800">-->
+<!--            <p class="text-sm text-gray-500 dark:text-gray-400">高风险投诉</p>-->
+<!--            <p class="mt-2 text-2xl font-semibold text-red-600 dark:text-red-400">{{ props.stats.highRiskCaseCount }}</p>-->
+<!--          </div>-->
+<!--          <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800">-->
+<!--            <p class="text-sm text-gray-500 dark:text-gray-400">未销号预警</p>-->
+<!--            <p class="mt-2 text-2xl font-semibold text-yellow-600 dark:text-yellow-400">{{ props.stats.openWarningCount }}</p>-->
+<!--          </div>-->
           <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
-            <p class="text-sm text-gray-500 dark:text-gray-400">高风险投诉</p>
-            <p class="mt-2 text-2xl font-semibold text-red-600 dark:text-red-400">{{ props.stats.highRiskCaseCount }}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">红色预警人数（年度）</p>
+            <button type="button" class="mt-2 text-2xl font-semibold text-red-600 hover:underline dark:text-red-400" @click="toggleWarningList('red')">
+              {{ props.stats.redWarningPersonCount }}
+            </button>
           </div>
           <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800">
-            <p class="text-sm text-gray-500 dark:text-gray-400">未销号预警</p>
-            <p class="mt-2 text-2xl font-semibold text-yellow-600 dark:text-yellow-400">{{ props.stats.openWarningCount }}</p>
+            <p class="text-sm text-gray-500 dark:text-gray-400">黄色预警人数（年度）</p>
+            <button type="button" class="mt-2 text-2xl font-semibold text-yellow-600 hover:underline dark:text-yellow-400" @click="toggleWarningList('yellow')">
+              {{ props.stats.yellowWarningPersonCount }}
+            </button>
           </div>
           <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800 sm:col-span-2 lg:col-span-4">
             <p class="text-sm text-gray-500 dark:text-gray-400">思想政治素养（25分）年度扣分概况</p>
@@ -43,6 +55,23 @@
               <span>违规记录: <strong>{{ props.stats.educationViolationCount }}</strong></span>
               <span>当前人员扣分: <strong>{{ props.stats.educationSelectedDeductionTotal }}</strong></span>
               <span>当前人员剩余: <strong>{{ props.stats.educationSelectedRemainingScore }}</strong></span>
+            </div>
+          </div>
+        </div>
+
+        <div v-if="activeWarningList" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
+          <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+            {{ activeWarningList === 'red' ? '红色预警人员列表' : '黄色预警人员列表' }}
+          </h2>
+          <div class="mt-4 space-y-3">
+            <div v-if="selectedWarningPeople.length === 0" class="text-sm text-gray-500 dark:text-gray-400">暂无人员</div>
+            <div v-for="item in selectedWarningPeople" :key="`${activeWarningList}-${item.ethics_profile_id}`" class="rounded-md border border-gray-200 p-3 dark:border-gray-700">
+              <div class="flex items-center justify-between gap-3">
+                <p class="font-medium text-gray-900 dark:text-white">{{ item.staff_no ?? '-' }} - {{ item.name ?? '未绑定' }}</p>
+                <span class="text-xs text-gray-500 dark:text-gray-400">{{ formatDate(item.detected_at) }}</span>
+              </div>
+              <p class="mt-1 text-sm text-gray-600 dark:text-gray-300">年度累计扣分：{{ item.annual_deduction ?? '-' }}</p>
+              <Link v-if="item.profile_url" :href="item.profile_url" class="mt-1 inline-block text-sm text-blue-600 hover:underline dark:text-blue-400">查看人员历年记录</Link>
             </div>
           </div>
         </div>
@@ -93,6 +122,7 @@
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue'
 import { Head, Link } from '@inertiajs/vue3'
+import { computed, ref } from 'vue'
 
 type CaseItem = {
   id: number | string
@@ -113,6 +143,17 @@ type WarningItem = {
   profile?: { user?: { name?: string } }
 }
 
+type AutoWarningPerson = {
+  ethics_profile_id?: number | null
+  staff_no?: string | null
+  name?: string | null
+  warning_level?: string
+  status?: string
+  detected_at?: string | null
+  annual_deduction?: number | null
+  profile_url?: string | null
+}
+
 const props = defineProps<{
   stats: {
     year: number
@@ -127,10 +168,30 @@ const props = defineProps<{
     educationViolationCount: number
     educationSelectedDeductionTotal: number
     educationSelectedRemainingScore: number
+    redWarningPersonCount: number
+    yellowWarningPersonCount: number
+  }
+  autoWarningPeople: {
+    red: AutoWarningPerson[]
+    yellow: AutoWarningPerson[]
   }
   recentCases: CaseItem[]
   recentWarnings: WarningItem[]
 }>()
+
+const activeWarningList = ref<'red' | 'yellow' | null>(null)
+
+const toggleWarningList = (level: 'red' | 'yellow'): void => {
+  activeWarningList.value = activeWarningList.value === level ? null : level
+}
+
+const selectedWarningPeople = computed(() => {
+  if (activeWarningList.value === null) {
+    return []
+  }
+
+  return props.autoWarningPeople[activeWarningList.value] ?? []
+})
 
 const formatDate = (value: unknown): string => {
   if (!value) {
