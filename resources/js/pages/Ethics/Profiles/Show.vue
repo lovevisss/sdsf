@@ -40,6 +40,8 @@
             <p class="text-sm text-gray-700 dark:text-gray-300">年份：{{ props.summary.year }}</p>
             <p class="text-sm text-gray-700 dark:text-gray-300">思政年度扣分：{{ props.summary.politicalAnnualDeductionTotal }}</p>
             <p class="text-sm text-gray-700 dark:text-gray-300">教育教学年度扣分：{{ props.summary.educationAnnualDeductionTotal }}</p>
+            <p class="text-sm text-gray-700 dark:text-gray-300">学术科研年度扣分：{{ props.summary.academicAnnualDeductionTotal }}</p>
+            <p class="text-sm text-gray-700 dark:text-gray-300">为人师表年度扣分：{{ props.summary.professionalAnnualDeductionTotal }}</p>
             <p class="text-sm text-gray-700 dark:text-gray-300">教师评价平均分：{{ props.summary.teacherEvaluationAverage }}</p>
             <p class="text-sm text-gray-700 dark:text-gray-300">教师评价后10%触发次数：{{ props.summary.automaticLowEvaluationCount }}</p>
           </div>
@@ -55,6 +57,8 @@
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">年份</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">思政扣分</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">教育教学扣分</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">学术科研扣分</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">为人师表扣分</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">教师评价均分</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">后10%触发次数</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">年度总分</th>
@@ -62,12 +66,14 @@
             </thead>
             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
               <tr v-if="props.yearlySummaries.length === 0">
-                <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">暂无历年数据</td>
+                <td colspan="8" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">暂无历年数据</td>
               </tr>
               <tr v-for="item in props.yearlySummaries" :key="item.year">
                 <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">{{ item.year }}</td>
                 <td class="px-4 py-3 text-sm text-red-600 dark:text-red-400">{{ item.politicalAnnualDeductionTotal }}</td>
                 <td class="px-4 py-3 text-sm text-red-600 dark:text-red-400">{{ item.educationAnnualDeductionTotal }}</td>
+                <td class="px-4 py-3 text-sm text-red-600 dark:text-red-400">{{ item.academicAnnualDeductionTotal }}</td>
+                <td class="px-4 py-3 text-sm text-red-600 dark:text-red-400">{{ item.professionalAnnualDeductionTotal }}</td>
                 <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ item.teacherEvaluationAverage }}</td>
                 <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ item.automaticLowEvaluationCount }}</td>
                 <td class="px-4 py-3 text-sm text-blue-600 dark:text-blue-400">{{ item.totalScore }}</td>
@@ -96,6 +102,10 @@ const props = defineProps<{
     politicalAnnualRemainingScore: number
     educationAnnualDeductionTotal: number
     educationAnnualRemainingScore: number
+    academicAnnualDeductionTotal: number
+    academicAnnualRemainingScore: number
+    professionalAnnualDeductionTotal: number
+    professionalAnnualRemainingScore: number
     teacherEvaluationAverage: number
     automaticLowEvaluationCount: number
     modules: {
@@ -110,6 +120,8 @@ const props = defineProps<{
     year: number
     politicalAnnualDeductionTotal: number
     educationAnnualDeductionTotal: number
+    academicAnnualDeductionTotal: number
+    professionalAnnualDeductionTotal: number
     teacherEvaluationAverage: number
     automaticLowEvaluationCount: number
     totalScore: number

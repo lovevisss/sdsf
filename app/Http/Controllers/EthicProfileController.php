@@ -4,8 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Department;
 use App\Models\EthicsProfile;
+use App\Models\EthicsAcademicViolation;
 use App\Models\EthicsEducationViolation;
 use App\Models\EthicsPoliticalViolation;
+use App\Models\EthicsProfessionalViolation;
 use App\Models\Staff;
 use App\Models\TeacherEvaluation;
 use App\Models\User;
@@ -196,6 +198,28 @@ class EthicProfileController extends Controller
             })
             ->map(fn ($items): float => (float) collect($items)->sum('deduction_points'));
 
+        $academicByYear = EthicsAcademicViolation::query()
+            ->where('staff_no', $staffNo)
+            ->select(['violation_at', 'deduction_points'])
+            ->get()
+            ->groupBy(function (EthicsAcademicViolation $row): int {
+                $timestamp = strtotime((string) $row->violation_at);
+
+                return $timestamp !== false ? (int) date('Y', $timestamp) : 0;
+            })
+            ->map(fn ($items): float => (float) collect($items)->sum('deduction_points'));
+
+        $professionalByYear = EthicsProfessionalViolation::query()
+            ->where('staff_no', $staffNo)
+            ->select(['violation_at', 'deduction_points'])
+            ->get()
+            ->groupBy(function (EthicsProfessionalViolation $row): int {
+                $timestamp = strtotime((string) $row->violation_at);
+
+                return $timestamp !== false ? (int) date('Y', $timestamp) : 0;
+            })
+            ->map(fn ($items): float => (float) collect($items)->sum('deduction_points'));
+
         $automaticByYear = EthicsEducationViolation::query()
             ->where('staff_no', $staffNo)
             ->where('violation_type', 10)
@@ -242,6 +266,8 @@ class EthicProfileController extends Controller
         $allYears = collect([
             ...array_keys($politicalByYear->all()),
             ...array_keys($educationByYear->all()),
+            ...array_keys($academicByYear->all()),
+            ...array_keys($professionalByYear->all()),
             ...array_keys($automaticByYear->all()),
             ...array_keys($evaluationByYear->all()),
             $year,
@@ -251,17 +277,19 @@ class EthicProfileController extends Controller
             ->sortDesc()
             ->values();
 
-        $buildSummary = function (int $targetYear) use ($politicalByYear, $educationByYear, $automaticByYear, $evaluationByYear): array {
+        $buildSummary = function (int $targetYear) use ($politicalByYear, $educationByYear, $academicByYear, $professionalByYear, $automaticByYear, $evaluationByYear): array {
             $politicalAnnualDeductionTotal = round((float) ($politicalByYear->get($targetYear, 0.0)), 2);
             $educationAnnualDeductionTotal = round((float) ($educationByYear->get($targetYear, 0.0)), 2);
+            $academicAnnualDeductionTotal = round((float) ($academicByYear->get($targetYear, 0.0)), 2);
+            $professionalAnnualDeductionTotal = round((float) ($professionalByYear->get($targetYear, 0.0)), 2);
             $teacherEvaluationAverage = round((float) ($evaluationByYear->get($targetYear, 0.0)), 2);
             $automaticLowEvaluationCount = (int) ($automaticByYear->get($targetYear, 0));
 
             $modules = [
                 'political' => max(0, round(25 - $politicalAnnualDeductionTotal, 2)),
                 'education' => max(0, round(25 - $educationAnnualDeductionTotal, 2)),
-                'academic' => 25.0,
-                'professional' => 25.0,
+                'academic' => max(0, round(25 - $academicAnnualDeductionTotal, 2)),
+                'professional' => max(0, round(25 - $professionalAnnualDeductionTotal, 2)),
             ];
 
             return [
@@ -270,6 +298,10 @@ class EthicProfileController extends Controller
                 'politicalAnnualRemainingScore' => max(0, round(25 - $politicalAnnualDeductionTotal, 2)),
                 'educationAnnualDeductionTotal' => $educationAnnualDeductionTotal,
                 'educationAnnualRemainingScore' => max(0, round(25 - $educationAnnualDeductionTotal, 2)),
+                'academicAnnualDeductionTotal' => $academicAnnualDeductionTotal,
+                'academicAnnualRemainingScore' => max(0, round(25 - $academicAnnualDeductionTotal, 2)),
+                'professionalAnnualDeductionTotal' => $professionalAnnualDeductionTotal,
+                'professionalAnnualRemainingScore' => max(0, round(25 - $professionalAnnualDeductionTotal, 2)),
                 'teacherEvaluationAverage' => $teacherEvaluationAverage,
                 'automaticLowEvaluationCount' => $automaticLowEvaluationCount,
                 'modules' => $modules,

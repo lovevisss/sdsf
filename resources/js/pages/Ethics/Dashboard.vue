@@ -57,6 +57,24 @@
               <span>当前人员剩余: <strong>{{ props.stats.educationSelectedRemainingScore }}</strong></span>
             </div>
           </div>
+
+          <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800 sm:col-span-2 lg:col-span-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">学术科研道德（25分）年度扣分概况</p>
+            <div class="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-700 dark:text-gray-300">
+              <span>违规记录: <strong>{{ props.stats.academicViolationCount }}</strong></span>
+              <span>当前人员扣分: <strong>{{ props.stats.academicSelectedDeductionTotal }}</strong></span>
+              <span>当前人员剩余: <strong>{{ props.stats.academicSelectedRemainingScore }}</strong></span>
+            </div>
+          </div>
+
+          <div class="rounded-lg bg-white p-5 shadow dark:bg-gray-800 sm:col-span-2 lg:col-span-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">为人师表（25分）年度扣分概况</p>
+            <div class="mt-2 flex flex-wrap items-center gap-4 text-sm text-gray-700 dark:text-gray-300">
+              <span>违规记录: <strong>{{ props.stats.professionalViolationCount }}</strong></span>
+              <span>当前人员扣分: <strong>{{ props.stats.professionalSelectedDeductionTotal }}</strong></span>
+              <span>当前人员剩余: <strong>{{ props.stats.professionalSelectedRemainingScore }}</strong></span>
+            </div>
+          </div>
         </div>
 
         <div v-if="activeWarningList" class="rounded-lg bg-white p-6 shadow dark:bg-gray-800">
@@ -81,6 +99,8 @@
           <Link href="/ethics/cases" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">查看投诉闭环</Link>
           <Link href="/ethics/political-violations" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">手工登记思政违规</Link>
           <Link href="/ethics/education-violations" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">手工登记教育教学违规</Link>
+          <Link href="/ethics/academic-violations" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">手工登记学术科研违规</Link>
+          <Link href="/ethics/professional-violations" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">手工登记为人师表违规</Link>
         </div>
 
         <div class="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -168,6 +188,12 @@ const props = defineProps<{
     educationViolationCount: number
     educationSelectedDeductionTotal: number
     educationSelectedRemainingScore: number
+    academicViolationCount: number
+    academicSelectedDeductionTotal: number
+    academicSelectedRemainingScore: number
+    professionalViolationCount: number
+    professionalSelectedDeductionTotal: number
+    professionalSelectedRemainingScore: number
     redWarningPersonCount: number
     yellowWarningPersonCount: number
   }

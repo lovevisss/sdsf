@@ -111,6 +111,16 @@ Route::middleware('auth')->group(function () {
     Route::post('/ethics/political-violations', [\App\Http\Controllers\EthicsPoliticalViolationController::class, 'store'])
         ->name('ethics.political-violations.store');
 
+    Route::get('/ethics/academic-violations', [\App\Http\Controllers\EthicsAcademicViolationController::class, 'index'])
+        ->name('ethics.academic-violations.index');
+    Route::post('/ethics/academic-violations', [\App\Http\Controllers\EthicsAcademicViolationController::class, 'store'])
+        ->name('ethics.academic-violations.store');
+
+    Route::get('/ethics/professional-violations', [\App\Http\Controllers\EthicsProfessionalViolationController::class, 'index'])
+        ->name('ethics.professional-violations.index');
+    Route::post('/ethics/professional-violations', [\App\Http\Controllers\EthicsProfessionalViolationController::class, 'store'])
+        ->name('ethics.professional-violations.store');
+
 
     // Dashboard
     Route::get('/conversations/dashboard', [\App\Http\Controllers\ConversationDashboardController::class, 'index'])

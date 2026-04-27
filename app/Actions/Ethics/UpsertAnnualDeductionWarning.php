@@ -4,6 +4,8 @@ namespace App\Actions\Ethics;
 
 use App\Models\EthicsEducationViolation;
 use App\Models\EthicsPoliticalViolation;
+use App\Models\EthicsAcademicViolation;
+use App\Models\EthicsProfessionalViolation;
 use App\Models\EthicsProfile;
 use App\Models\EthicsWarning;
 
@@ -77,7 +79,17 @@ class UpsertAnnualDeductionWarning
             ->whereYear('violation_at', $year)
             ->sum('deduction_points');
 
-        return round($political + $education, 2);
+        $academic = (float) EthicsAcademicViolation::query()
+            ->where('staff_no', $staffNo)
+            ->whereYear('violation_at', $year)
+            ->sum('deduction_points');
+
+        $professional = (float) EthicsProfessionalViolation::query()
+            ->where('staff_no', $staffNo)
+            ->whereYear('violation_at', $year)
+            ->sum('deduction_points');
+
+        return round($political + $education + $academic + $professional, 2);
     }
 
     private function targetWarningLevel(float $annualDeductionTotal): ?string
