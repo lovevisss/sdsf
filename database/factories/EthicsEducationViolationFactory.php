@@ -23,11 +23,19 @@ class EthicsEducationViolationFactory extends Factory
             'staff_no' => 'T'.$this->faker->unique()->numberBetween(1000, 9999),
             'staff_name' => $this->faker->name(),
             'staff_unit_name' => $this->faker->word().'学院',
+            'academic_year' => $this->academicYear(),
             'violation_type' => $this->faker->numberBetween(8, 15),
             'violation_at' => now()->subDays($this->faker->numberBetween(0, 90)),
             'deduction_points' => $this->faker->randomFloat(2, 0.5, 8),
             'notes' => $this->faker->sentence(),
         ];
     }
-}
 
+    private function academicYear(): string
+    {
+        $now = now();
+        $startYear = $now->month >= 9 ? $now->year : $now->year - 1;
+
+        return $startYear.'-'.($startYear + 1);
+    }
+}

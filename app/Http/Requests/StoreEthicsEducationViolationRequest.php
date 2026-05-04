@@ -19,6 +19,7 @@ class StoreEthicsEducationViolationRequest extends FormRequest
             'staff_no' => ['required', 'string', 'max:50'],
             'staff_name' => ['required', 'string', 'max:100'],
             'staff_unit_name' => ['nullable', 'string', 'max:255'],
+            'academic_year' => ['nullable', 'string', 'max:20'],
             'violation_type' => ['required', 'integer', 'between:8,15'],
             'violation_at' => ['required', 'date'],
             'deduction_points' => ['required', 'numeric', 'min:0.01', 'max:25'],
@@ -64,4 +65,3 @@ class StoreEthicsEducationViolationRequest extends FormRequest
         });
     }
 }
-

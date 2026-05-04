@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Department;
 use App\Models\EthicsAcademicViolation;
+use App\Models\EthicsEducationViolation;
 use App\Models\EthicsProfessionalViolation;
 use App\Models\EthicsProfile;
 use App\Models\User;
@@ -121,5 +122,52 @@ class EthicsExtendedModulesTest extends TestCase
                 ->where('summary.modules.professional', 22)
             );
     }
-}
 
+    public function test_education_violation_list_filters_by_academic_year_and_department(): void
+    {
+        $admin = User::factory()->withoutTwoFactor()->create([
+            'role' => 'admin',
+            'is_admin' => true,
+        ]);
+
+        EthicsEducationViolation::factory()->create([
+            'staff_no' => 'T-KEEP',
+            'staff_name' => 'Keep Teacher',
+            'staff_unit_name' => '信息工程学院',
+            'academic_year' => '2024-2025',
+            'violation_at' => '2024-01-01 00:00:00',
+            'deduction_points' => 5,
+        ]);
+
+        EthicsEducationViolation::factory()->create([
+            'staff_no' => 'T-WRONG-YEAR',
+            'staff_name' => 'Wrong Year Teacher',
+            'staff_unit_name' => '信息工程学院',
+            'academic_year' => '2023-2024',
+            'violation_at' => '2023-01-01 00:00:00',
+            'deduction_points' => 5,
+        ]);
+
+        EthicsEducationViolation::factory()->create([
+            'staff_no' => 'T-WRONG-DEPT',
+            'staff_name' => 'Wrong Department Teacher',
+            'staff_unit_name' => '外国语学院',
+            'academic_year' => '2024-2025',
+            'violation_at' => '2024-01-01 00:00:00',
+            'deduction_points' => 5,
+        ]);
+
+        $this->actingAs($admin)
+            ->get('/ethics/education-violations?academic_year=2024-2025&department='.urlencode('信息工程学院'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Ethics/EducationViolations/Index')
+                ->where('academicYear', '2024-2025')
+                ->where('selectedDepartment', '信息工程学院')
+                ->has('records.data', 1)
+                ->where('records.data.0.staff_no', 'T-KEEP')
+                ->has('staffSummaries', 1)
+                ->where('staffSummaries.0.staff_no', 'T-KEEP')
+            );
+    }
+}

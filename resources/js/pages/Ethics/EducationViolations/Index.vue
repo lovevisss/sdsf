@@ -42,6 +42,26 @@
           <span v-if="props.staffOptionsError" class="ml-2 text-red-600 dark:text-red-400">{{ props.staffOptionsError }}</span>
         </div>
 
+        <form class="grid grid-cols-1 gap-3 rounded-lg bg-white p-5 shadow md:grid-cols-3 dark:bg-gray-800" @submit.prevent="applyListFilters">
+          <select v-model="filterAcademicYear" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white">
+            <option v-for="item in props.academicYearOptions" :key="item" :value="item">{{ item }}</option>
+          </select>
+
+          <select v-model="filterDepartment" class="w-full rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white">
+            <option value="">全部分院</option>
+            <option v-for="item in props.departmentOptions" :key="item" :value="item">{{ item }}</option>
+          </select>
+
+          <div class="flex gap-2">
+            <button type="submit" class="rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-800 dark:bg-gray-100 dark:text-gray-900 dark:hover:bg-white">
+              筛选
+            </button>
+            <button type="button" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700" @click="resetListFilters">
+              重置
+            </button>
+          </div>
+        </form>
+
         <form class="grid grid-cols-1 gap-3 rounded-lg bg-white p-5 shadow md:grid-cols-2 lg:grid-cols-3 dark:bg-gray-800" @submit.prevent="submit">
           <div ref="staffPickerRef" class="relative">
             <input
@@ -215,15 +235,21 @@ const props = defineProps<{
   staffOptionsCount: number
   staffOptionsError?: string | null
   year: number
+  academicYear: string
+  selectedDepartment?: string | null
   selectedStaffNo?: string | null
   selectedStaffSummary?: StaffSummary | null
   staffSummaries: StaffSummary[]
   violationTypeOptions: Record<string, string>
+  academicYearOptions: string[]
+  departmentOptions: string[]
 }>()
 
 const staffQuery = ref('')
 const showStaffPanel = ref(false)
 const staffPickerRef = ref<HTMLElement | null>(null)
+const filterAcademicYear = ref(props.academicYear)
+const filterDepartment = ref(props.selectedDepartment ?? '')
 
 const filteredStaffOptions = computed(() => {
   const keyword = staffQuery.value.trim().toLowerCase()
@@ -247,10 +273,13 @@ const form = useForm({
   violation_type: null as number | null,
   violation_at: new Date().toISOString().slice(0, 16),
   deduction_points: 1,
+  academic_year: props.academicYear,
   notes: '',
 })
 
 const submit = (): void => {
+  form.academic_year = filterAcademicYear.value
+
   if (!form.staff_no && staffQuery.value.trim()) {
     const exactMatch = props.staffOptions.find((item) => {
       const keyword = staffQuery.value.trim().toLowerCase()
@@ -284,11 +313,11 @@ const applyStaffFilter = (): void => {
     return
   }
 
-  router.get('/ethics/education-violations', { staff_no: form.staff_no }, { preserveState: true })
+  router.get('/ethics/education-violations', currentFilters({ staff_no: form.staff_no }), { preserveState: true })
 }
 
 const clearStaffFilter = (): void => {
-  router.get('/ethics/education-violations', {}, { preserveState: false })
+  router.get('/ethics/education-violations', currentFilters(), { preserveState: false })
 }
 
 const pickStaffSummary = (item: StaffSummary): void => {
@@ -296,7 +325,7 @@ const pickStaffSummary = (item: StaffSummary): void => {
   form.staff_name = item.staff_name
   form.staff_unit_name = item.staff_unit_name ?? ''
   staffQuery.value = `${item.staff_no} - ${item.staff_name}`
-  router.get('/ethics/education-violations', { staff_no: item.staff_no }, { preserveState: true })
+  router.get('/ethics/education-violations', currentFilters({ staff_no: item.staff_no }), { preserveState: true })
 }
 
 const selectStaff = (item: ProfileOption): void => {
@@ -312,6 +341,36 @@ const onStaffInput = (): void => {
   form.staff_no = null
   form.staff_name = ''
   form.staff_unit_name = ''
+}
+
+const currentFilters = (extra: Record<string, string | null> = {}): Record<string, string> => {
+  const filters: Record<string, string> = {
+    academic_year: filterAcademicYear.value,
+  }
+
+  if (filterDepartment.value) {
+    filters.department = filterDepartment.value
+  }
+
+  Object.entries(extra).forEach(([key, value]) => {
+    if (value) {
+      filters[key] = value
+    }
+  })
+
+  return filters
+}
+
+const applyListFilters = (): void => {
+  form.academic_year = filterAcademicYear.value
+  router.get('/ethics/education-violations', currentFilters(), { preserveState: true })
+}
+
+const resetListFilters = (): void => {
+  filterAcademicYear.value = props.academicYearOptions[0] ?? props.academicYear
+  filterDepartment.value = ''
+  form.academic_year = filterAcademicYear.value
+  router.get('/ethics/education-violations', { academic_year: filterAcademicYear.value }, { preserveState: false })
 }
 
 const closeStaffPanelOnOutsideClick = (event: MouseEvent): void => {

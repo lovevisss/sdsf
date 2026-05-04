@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Actions\Ethics\UpsertAnnualDeductionWarning;
 use App\Http\Requests\StoreEthicsEducationViolationRequest;
+use App\Models\Department;
 use App\Models\EthicsEducationViolation;
 use App\Models\EthicsProfile;
 use App\Models\Staff;
@@ -26,12 +27,21 @@ class EducationViolationController extends Controller
         $this->authorize('viewAny', EthicsEducationViolation::class);
 
         $user = $request->user();
-        $year = (int) $request->query('year', now()->year);
+        $academicYear = (string) $request->query('academic_year', $this->currentAcademicYear());
+        $department = $request->query('department');
         $selectedStaffNo = $request->query('staff_no');
+        $year = $this->firstYearOfAcademicYear($academicYear) ?? (int) $request->query('year', now()->year);
 
         $scopedQuery = EthicsEducationViolation::query()
             ->with(['profile.user:id,name,department_id', 'recorder:id,name'])
-            ->whereYear('violation_at', $year);
+            ->where(function (Builder $builder) use ($academicYear, $year): void {
+                $builder->where('academic_year', $academicYear)
+                    ->orWhere('academic_year', (string) $year)
+                    ->orWhere(function (Builder $fallbackQuery) use ($year): void {
+                        $fallbackQuery->whereNull('academic_year')
+                            ->whereYear('violation_at', $year);
+                    });
+            });
 
         if ($user->role === 'leader' && ! ($user->is_admin ?? false)) {
             $departmentName = $user->department?->name;
@@ -49,6 +59,10 @@ class EducationViolationController extends Controller
 
         if ($user->role === 'advisor') {
             $scopedQuery->where('violator_user_id', $user->id);
+        }
+
+        if (is_string($department) && $department !== '') {
+            $scopedQuery->where('staff_unit_name', $department);
         }
 
         $query = clone $scopedQuery;
@@ -91,6 +105,8 @@ class EducationViolationController extends Controller
         return Inertia::render('Ethics/EducationViolations/Index', [
             'records' => $records,
             'year' => $year,
+            'academicYear' => $academicYear,
+            'selectedDepartment' => is_string($department) ? $department : null,
             'selectedStaffNo' => $selectedStaffNo,
             'selectedStaffSummary' => $selectedStaffSummary,
             'staffSummaries' => $staffSummaries,
@@ -107,6 +123,8 @@ class EducationViolationController extends Controller
             'staffOptions' => $staffOptions,
             'staffOptionsCount' => count($staffOptions),
             'staffOptionsError' => count($staffOptions) === 0 ? '未能读取 Staff 人员数据，请检查 staff_db 连接。' : null,
+            'academicYearOptions' => $this->academicYearOptions($academicYear),
+            'departmentOptions' => $this->departmentOptions(),
         ]);
     }
 
@@ -116,9 +134,11 @@ class EducationViolationController extends Controller
 
         $validated = $request->validated();
         $profile = EthicsProfile::query()->where('staff_no', $validated['staff_no'])->first();
+        $academicYear = $validated['academic_year'] ?? $this->academicYearFromDate((string) $validated['violation_at']);
 
         EthicsEducationViolation::query()->create([
             ...$validated,
+            'academic_year' => $academicYear,
             'ethics_profile_id' => $profile?->id,
             'violator_user_id' => $profile?->user_id,
             'recorder_user_id' => $request->user()->id,
@@ -130,6 +150,7 @@ class EducationViolationController extends Controller
 
         return redirect()->route('ethics.education-violations.index', [
             'staff_no' => $validated['staff_no'],
+            'academic_year' => $academicYear,
         ])->with('success', '教育教学行为违规记录已保存。');
     }
 
@@ -152,5 +173,82 @@ class EducationViolationController extends Controller
 
             return [];
         }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function academicYearOptions(string $selectedAcademicYear): array
+    {
+        $years = EthicsEducationViolation::query()
+            ->whereNotNull('academic_year')
+            ->distinct()
+            ->orderByDesc('academic_year')
+            ->pluck('academic_year')
+            ->filter()
+            ->map(fn ($value): string => (string) $value)
+            ->all();
+
+        $years[] = $selectedAcademicYear;
+
+        return collect($years)->unique()->values()->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function departmentOptions(): array
+    {
+        $localDepartments = Department::query()
+            ->orderBy('name')
+            ->pluck('name')
+            ->filter()
+            ->map(fn ($value): string => (string) $value);
+
+        $violationDepartments = EthicsEducationViolation::query()
+            ->whereNotNull('staff_unit_name')
+            ->distinct()
+            ->orderBy('staff_unit_name')
+            ->pluck('staff_unit_name')
+            ->filter()
+            ->map(fn ($value): string => (string) $value);
+
+        return $localDepartments
+            ->merge($violationDepartments)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    private function currentAcademicYear(): string
+    {
+        $now = now();
+        $startYear = $now->month >= 9 ? $now->year : $now->year - 1;
+
+        return $startYear.'-'.($startYear + 1);
+    }
+
+    private function academicYearFromDate(string $date): string
+    {
+        $timestamp = strtotime($date);
+
+        if ($timestamp === false) {
+            return $this->currentAcademicYear();
+        }
+
+        $year = (int) date('Y', $timestamp);
+        $month = (int) date('n', $timestamp);
+        $startYear = $month >= 9 ? $year : $year - 1;
+
+        return $startYear.'-'.($startYear + 1);
+    }
+
+    private function firstYearOfAcademicYear(string $academicYear): ?int
+    {
+        if (preg_match('/(\d{4})/', $academicYear, $matches) !== 1) {
+            return null;
+        }
+
+        return (int) $matches[1];
     }
 }

@@ -43,6 +43,23 @@ class EthicsGovernanceTest extends TestCase
         $response->assertOk();
     }
 
+    public function test_ethics_dashboard_does_not_expose_complaint_content(): void
+    {
+        $admin = User::factory()->withoutTwoFactor()->create([
+            'role' => 'admin',
+        ]);
+
+        $response = $this->actingAs($admin)->get('/ethics/dashboard');
+
+        $response->assertOk();
+
+        $page = $response->viewData('page');
+
+        $this->assertArrayNotHasKey('recentCases', $page['props']);
+        $this->assertArrayNotHasKey('openCaseCount', $page['props']['stats']);
+        $this->assertArrayNotHasKey('highRiskCaseCount', $page['props']['stats']);
+    }
+
     public function test_advisor_can_view_staff_archive_list_in_index(): void
     {
         $department = Department::factory()->create();
@@ -482,13 +499,14 @@ class EthicsGovernanceTest extends TestCase
             'notes' => '测试教育教学行为违规登记。',
         ]);
 
-        $response->assertRedirect('/ethics/education-violations?staff_no=T1001');
+        $response->assertRedirect('/ethics/education-violations?staff_no=T1001&academic_year=2025-2026');
 
         $this->assertDatabaseHas('ethics_education_violations', [
             'staff_no' => 'T1001',
             'staff_name' => '教育测试老师',
             'recorder_user_id' => $leader->id,
             'violation_type' => 10,
+            'academic_year' => '2025-2026',
         ]);
     }
 
@@ -726,4 +744,3 @@ class EthicsGovernanceTest extends TestCase
         );
     }
 }
-

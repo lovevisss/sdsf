@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\EthicsCase;
 use App\Models\EthicsAcademicViolation;
 use App\Models\EthicsEducationViolation;
 use App\Models\EthicsPoliticalViolation;
@@ -29,7 +28,6 @@ class EthicsDashboardController extends Controller
         }
 
         $profileQuery = EthicsProfile::query();
-        $caseQuery = EthicsCase::query();
         $warningQuery = EthicsWarning::query();
         $politicalViolationQuery = EthicsPoliticalViolation::query()->whereYear('violation_at', $year);
         $educationViolationQuery = EthicsEducationViolation::query()->whereYear('violation_at', $year);
@@ -38,7 +36,6 @@ class EthicsDashboardController extends Controller
 
         if ($user->role === 'leader') {
             $profileQuery->where('department_id', $user->department_id);
-            $caseQuery->where('department_id', $user->department_id);
             $warningQuery->whereHas('profile', function (Builder $query) use ($user): void {
                 $query->where('department_id', $user->department_id);
             });
@@ -58,9 +55,6 @@ class EthicsDashboardController extends Controller
 
         if ($user->role === 'advisor') {
             $profileQuery->where('user_id', $user->id);
-            $caseQuery->whereHas('profile', function (Builder $query) use ($user): void {
-                $query->where('user_id', $user->id);
-            });
             $warningQuery->whereHas('profile', function (Builder $query) use ($user): void {
                 $query->where('user_id', $user->id);
             });
@@ -195,8 +189,6 @@ class EthicsDashboardController extends Controller
                 'year' => $year,
                 'selectedStaffNo' => $selectedStaffNo,
                 'profileCount' => $profileCount,
-                'openCaseCount' => (clone $caseQuery)->whereNotIn('status', ['closed', 'rejected'])->count(),
-                'highRiskCaseCount' => (clone $caseQuery)->where('risk_level', 'high')->count(),
                 'openWarningCount' => (clone $warningQuery)->where('status', '!=', 'closed')->count(),
                 'politicalViolationCount' => (clone $politicalViolationQuery)->count(),
                 'politicalSelectedDeductionTotal' => round($politicalSelectedDeductionTotal, 2),
@@ -217,11 +209,6 @@ class EthicsDashboardController extends Controller
                 'red' => $redWarningPeople,
                 'yellow' => $yellowWarningPeople,
             ],
-            'recentCases' => (clone $caseQuery)
-                ->with(['profile.user:id,name'])
-                ->latest('reported_at')
-                ->limit(10)
-                ->get(),
             'recentWarnings' => (clone $warningQuery)
                 ->with(['profile.user:id,name'])
                 ->latest('detected_at')
@@ -269,4 +256,3 @@ class EthicsDashboardController extends Controller
         }
     }
 }
-

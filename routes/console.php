@@ -12,3 +12,6 @@ Schedule::command('ethics:sync-teacher-evaluation-bottom-decile')
     ->dailyAt('02:10')
     ->withoutOverlapping();
 
+Schedule::command('ethics:sync-teaching-performance-bottom-decile')
+    ->dailyAt('02:20')
+    ->withoutOverlapping();

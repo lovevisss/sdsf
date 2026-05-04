@@ -7,22 +7,22 @@ use App\Actions\Ethics\UpsertAnnualDeductionWarning;
 use App\Models\EthicsEducationViolation;
 use App\Models\EthicsProfile;
 use App\Models\Staff;
-use App\Models\TeacherEvaluation;
+use App\Models\TeachingPerformanceAssessment;
 use App\Models\User;
 use Illuminate\Console\Command;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
-class SyncTeacherEvaluationBottomDecile extends Command
+class SyncTeachingPerformanceBottomDecile extends Command
 {
-    private const SOURCE_NOTE = '教师评价后10%';
+    private const SOURCE_NOTE = '教学业绩考核后10%';
 
     /**
      * The name and signature of the console command.
      *
      * @var string
      */
-    protected $signature = 'ethics:sync-teacher-evaluation-bottom-decile
+    protected $signature = 'ethics:sync-teaching-performance-bottom-decile
                             {academicYear? : Academic year in XN format, e.g. 2025-2026}
                             {--recorder-user-id= : Local user id used as recorder}
                             {--dry-run : Preview only, do not write records}';
@@ -32,19 +32,15 @@ class SyncTeacherEvaluationBottomDecile extends Command
      *
      * @var string
      */
-    protected $description = 'Sync yearly bottom 10% teacher evaluations into ethics education violations.';
+    protected $description = 'Sync yearly bottom 10% teaching performance assessment scores into ethics education violations.';
 
     public function __construct(
         private readonly TeacherEvaluationBottomDecileSelector $selector,
         private readonly UpsertAnnualDeductionWarning $upsertAnnualDeductionWarning,
-    )
-    {
+    ) {
         parent::__construct();
     }
 
-    /**
-     * Execute the console command.
-     */
     public function handle(): int
     {
         $recorderUserId = $this->resolveRecorderUserId();
@@ -54,28 +50,52 @@ class SyncTeacherEvaluationBottomDecile extends Command
 
         $academicYear = $this->argument('academicYear');
 
-        $query = TeacherEvaluation::query()
-            ->selectRaw('XN as academic_year, JSBH as teacher_no, MAX(JSXM) as teacher_name, AVG(PJCJ) as average_score, MAX(TSTAMP) as evaluated_at')
+        $query = TeachingPerformanceAssessment::query()
+            ->select(['DID', 'FS', 'BZ', 'DWMC', 'KHDJ', 'XM', 'GH', 'XN'])
             ->whereNotNull('XN')
-            ->whereNotNull('JSBH')
-            ->whereNotNull('PJCJ')
-            ->groupBy('XN', 'JSBH');
+            ->whereNotNull('GH')
+            ->whereNotNull('FS');
 
         if (is_string($academicYear) && $academicYear !== '') {
             $query->where('XN', $academicYear);
         }
 
         try {
-            /** @var Collection<int, object{academic_year: string, teacher_no: string, teacher_name: string|null, average_score: float|int|string, evaluated_at: string|null}> $aggregated */
-            $aggregated = $query->get();
+            /** @var Collection<int, TeachingPerformanceAssessment> $rows */
+            $rows = $query->get();
         } catch (\Throwable $exception) {
-            $this->error('Failed to read teacher evaluations: '.$exception->getMessage());
+            $this->error('Failed to read teaching performance assessments: '.$exception->getMessage());
 
             return self::FAILURE;
         }
 
-        if ($aggregated->isEmpty()) {
-            $this->warn('No teacher evaluation data found for sync.');
+        $normalizedRows = $rows
+            ->map(function (TeachingPerformanceAssessment $row): ?array {
+                $score = $this->normalizeScore($row->FS);
+                $academicYear = trim((string) $row->XN);
+                $teacherNo = trim((string) $row->GH);
+
+                if ($score === null || $academicYear === '' || $teacherNo === '') {
+                    return null;
+                }
+
+                $evaluationYear = $this->resolveEvaluationYear($academicYear);
+
+                return [
+                    'academic_year' => $academicYear,
+                    'teacher_no' => $teacherNo,
+                    'teacher_name' => trim((string) ($row->XM ?? '')),
+                    'staff_unit_name' => trim((string) ($row->DWMC ?? '')) ?: null,
+                    'average_score' => $score,
+                    'evaluation_year' => $evaluationYear,
+                    'evaluated_at' => sprintf('%04d-01-01 00:00:00', $evaluationYear),
+                ];
+            })
+            ->filter()
+            ->values();
+
+        if ($normalizedRows->isEmpty()) {
+            $this->warn('No teaching performance assessment data found for sync.');
 
             return self::SUCCESS;
         }
@@ -83,44 +103,16 @@ class SyncTeacherEvaluationBottomDecile extends Command
         $inserted = 0;
         $skipped = 0;
 
-        foreach ($aggregated->groupBy('academic_year') as $groupAcademicYear => $yearRows) {
-            $normalizedRows = $yearRows->map(function (object $row) use ($groupAcademicYear, $academicYear): array {
-                $academicYearSource = is_string($academicYear) && $academicYear !== ''
-                    ? $academicYear
-                    : $this->extractAcademicYearFromRow($row, (string) $groupAcademicYear);
-
-                $evaluationYear = $this->resolveEvaluationYear(
-                    $academicYearSource,
-                    (string) ($row->evaluated_at ?? ''),
-                );
-
-                return [
-                    'academic_year' => $academicYearSource,
-                    'teacher_no' => trim((string) $row->teacher_no),
-                    'teacher_name' => trim((string) ($row->teacher_name ?? '')),
-                    'average_score' => (float) $row->average_score,
-                    'evaluation_year' => $evaluationYear,
-                    'evaluated_at' => sprintf('%04d-01-01 00:00:00', $evaluationYear),
-                ];
-            })->filter(fn (array $row): bool => $row['teacher_no'] !== '')->values();
-
-            $bottomRows = $this->selector->select(
-                $normalizedRows->map(fn (array $row): array => [
-                    'academic_year' => $row['academic_year'],
-                    'teacher_no' => $row['teacher_no'],
-                    'teacher_name' => $row['teacher_name'],
-                    'average_score' => $row['average_score'],
-                    'evaluation_year' => $row['evaluation_year'],
-                    'evaluated_at' => $row['evaluated_at'],
-                ]),
-            );
+        foreach ($normalizedRows->groupBy('academic_year') as $groupAcademicYear => $yearRows) {
+            $bottomRows = $this->selector->select($yearRows);
 
             foreach ($bottomRows as $row) {
                 $wasInserted = $this->syncViolationRecord(
-                    academicYear: $row['academic_year'] ?? (string) $normalizedRows->first()['academic_year'],
+                    academicYear: (string) ($row['academic_year'] ?? $groupAcademicYear),
                     teacherNo: $row['teacher_no'],
                     teacherName: $row['teacher_name'],
-                    averageScore: (float) $row['average_score'],
+                    staffUnitName: $row['staff_unit_name'] ?? null,
+                    score: (float) $row['average_score'],
                     evaluationYear: (int) ($row['evaluation_year'] ?? now()->year),
                     recorderUserId: $recorderUserId,
                     dryRun: (bool) $this->option('dry-run'),
@@ -166,7 +158,8 @@ class SyncTeacherEvaluationBottomDecile extends Command
         string $academicYear,
         string $teacherNo,
         string $teacherName,
-        float $averageScore,
+        ?string $staffUnitName,
+        float $score,
         int $evaluationYear,
         int $recorderUserId,
         bool $dryRun,
@@ -180,7 +173,6 @@ class SyncTeacherEvaluationBottomDecile extends Command
             ->where('notes', self::SOURCE_NOTE)
             ->where(function ($query) use ($academicYear, $violationYear): void {
                 $query->where('academic_year', $academicYear)
-                    ->orWhere('academic_year', (string) $violationYear)
                     ->orWhere(function ($fallbackQuery) use ($violationYear): void {
                         $fallbackQuery->whereNull('academic_year')
                             ->whereYear('violation_at', $violationYear);
@@ -199,29 +191,29 @@ class SyncTeacherEvaluationBottomDecile extends Command
         } catch (\Throwable) {
             // Keep sync running even when the external staff source is unavailable.
         }
-        $staffName = $staff?->name ?? ($teacherName !== '' ? $teacherName : $teacherNo);
-        $staffUnitName = $staff?->unit_name;
 
+        $staffName = $staff?->name ?? ($teacherName !== '' ? $teacherName : $teacherNo);
+        $resolvedUnitName = $staff?->unit_name ?? $staffUnitName;
         $profile = EthicsProfile::query()->where('staff_no', $teacherNo)->first();
 
         if ($dryRun) {
-            $this->line("[dry-run] {$academicYear} {$teacherNo} {$staffName} avg={$averageScore}");
+            $this->line("[dry-run] {$academicYear} {$teacherNo} {$staffName} score={$score}");
 
             return true;
         }
 
-        DB::transaction(function () use ($profile, $academicYear, $teacherNo, $staffName, $staffUnitName, $violationAt, $recorderUserId): void {
+        DB::transaction(function () use ($profile, $academicYear, $teacherNo, $staffName, $resolvedUnitName, $violationAt, $recorderUserId): void {
             EthicsEducationViolation::query()->create([
                 'ethics_profile_id' => $profile?->id,
                 'violator_user_id' => $profile?->user_id,
                 'recorder_user_id' => $recorderUserId,
                 'staff_no' => $teacherNo,
                 'staff_name' => $staffName,
-                'staff_unit_name' => $staffUnitName,
+                'staff_unit_name' => $resolvedUnitName,
                 'academic_year' => $academicYear,
                 'violation_type' => 10,
                 'violation_at' => $violationAt,
-                'deduction_points' => 2,
+                'deduction_points' => 5,
                 'notes' => self::SOURCE_NOTE,
             ]);
         });
@@ -231,38 +223,27 @@ class SyncTeacherEvaluationBottomDecile extends Command
         return true;
     }
 
-    private function resolveEvaluationYear(string $academicYear, string $evaluatedAt): int
+    private function normalizeScore(mixed $value): ?float
+    {
+        if (is_numeric($value)) {
+            return (float) $value;
+        }
+
+        if (! is_string($value)) {
+            return null;
+        }
+
+        $normalized = str_replace(',', '', trim($value));
+
+        return is_numeric($normalized) ? (float) $normalized : null;
+    }
+
+    private function resolveEvaluationYear(string $academicYear): int
     {
         if (preg_match('/(\d{4})/', $academicYear, $matches) === 1) {
             return (int) $matches[1];
         }
 
-        $timestamp = strtotime($evaluatedAt);
-
-        if ($timestamp !== false) {
-            return (int) date('Y', $timestamp);
-        }
-
         return now()->year;
-    }
-
-    private function extractAcademicYearFromRow(object $row, string $fallback): string
-    {
-        $rowArray = (array) $row;
-
-        $candidates = [
-            $rowArray['academic_year'] ?? null,
-            $rowArray['XN'] ?? null,
-            $rowArray['xn'] ?? null,
-            $fallback,
-        ];
-
-        foreach ($candidates as $candidate) {
-            if (is_string($candidate) && trim($candidate) !== '') {
-                return trim($candidate);
-            }
-        }
-
-        return $fallback;
     }
 }

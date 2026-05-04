@@ -114,6 +114,104 @@ class SyncTeacherEvaluationBottomDecileCommandTest extends TestCase
         );
     }
 
+    public function test_it_syncs_teaching_performance_bottom_decile_as_five_point_education_violation(): void
+    {
+        $this->prepareStaffDbForTeachingPerformanceAssessments();
+
+        foreach (range(1, 20) as $index) {
+            DB::connection('staff_db')->table('t_ejxyybt_jxyjkh')->insert([
+                'DID' => (string) $index,
+                'FS' => (string) $index,
+                'BZ' => null,
+                'DWMC' => $index <= 2 ? '低分学院' : '高分学院',
+                'KHDJ' => null,
+                'XM' => 'Teacher '.$index,
+                'GH' => 'P'.str_pad((string) $index, 4, '0', STR_PAD_LEFT),
+                'XN' => '2024-2025',
+            ]);
+        }
+
+        $recorder = User::factory()->withoutTwoFactor()->create();
+
+        Artisan::call('ethics:sync-teaching-performance-bottom-decile', [
+            'academicYear' => '2024-2025',
+            '--recorder-user-id' => $recorder->id,
+        ]);
+
+        $this->assertDatabaseHas('ethics_education_violations', [
+            'staff_no' => 'P0001',
+            'staff_name' => 'Teacher 1',
+            'staff_unit_name' => '低分学院',
+            'academic_year' => '2024-2025',
+            'violation_type' => 10,
+            'deduction_points' => 5,
+            'notes' => '教学业绩考核后10%',
+            'violation_at' => '2024-01-01 00:00:00',
+        ]);
+
+        $this->assertDatabaseHas('ethics_education_violations', [
+            'staff_no' => 'P0002',
+            'academic_year' => '2024-2025',
+            'deduction_points' => 5,
+            'notes' => '教学业绩考核后10%',
+        ]);
+
+        $this->assertDatabaseMissing('ethics_education_violations', [
+            'staff_no' => 'P0003',
+            'notes' => '教学业绩考核后10%',
+        ]);
+    }
+
+    public function test_it_does_not_duplicate_teaching_performance_records_for_same_academic_year(): void
+    {
+        $this->prepareStaffDbForTeachingPerformanceAssessments();
+
+        DB::connection('staff_db')->table('t_ejxyybt_jxyjkh')->insert([
+            [
+                'DID' => 'A',
+                'FS' => '60',
+                'BZ' => null,
+                'DWMC' => '测试学院',
+                'KHDJ' => null,
+                'XM' => 'Teacher A',
+                'GH' => 'PX001',
+                'XN' => '2023-2024',
+            ],
+            [
+                'DID' => 'B',
+                'FS' => '95',
+                'BZ' => null,
+                'DWMC' => '测试学院',
+                'KHDJ' => null,
+                'XM' => 'Teacher B',
+                'GH' => 'PX002',
+                'XN' => '2023-2024',
+            ],
+        ]);
+
+        $recorder = User::factory()->withoutTwoFactor()->create();
+
+        Artisan::call('ethics:sync-teaching-performance-bottom-decile', [
+            'academicYear' => '2023-2024',
+            '--recorder-user-id' => $recorder->id,
+        ]);
+
+        Artisan::call('ethics:sync-teaching-performance-bottom-decile', [
+            'academicYear' => '2023-2024',
+            '--recorder-user-id' => $recorder->id,
+        ]);
+
+        $this->assertSame(
+            1,
+            DB::table('ethics_education_violations')
+                ->where('staff_no', 'PX001')
+                ->where('academic_year', '2023-2024')
+                ->where('violation_type', 10)
+                ->where('notes', '教学业绩考核后10%')
+                ->count(),
+        );
+    }
+
     private function prepareStaffDbForTeacherEvaluations(): void
     {
         $sqlitePath = database_path('staff_eval_sync_test.sqlite');
@@ -145,5 +243,34 @@ class SyncTeacherEvaluationBottomDecileCommandTest extends TestCase
             $table->dateTime('TSTAMP')->nullable();
         });
     }
-}
 
+    private function prepareStaffDbForTeachingPerformanceAssessments(): void
+    {
+        $sqlitePath = database_path('staff_eval_sync_test.sqlite');
+
+        if (! file_exists($sqlitePath)) {
+            touch($sqlitePath);
+        }
+
+        config()->set('database.connections.staff_db', [
+            'driver' => 'sqlite',
+            'database' => $sqlitePath,
+            'prefix' => '',
+            'foreign_key_constraints' => false,
+        ]);
+
+        DB::purge('staff_db');
+
+        Schema::connection('staff_db')->dropIfExists('t_ejxyybt_jxyjkh');
+        Schema::connection('staff_db')->create('t_ejxyybt_jxyjkh', function (Blueprint $table): void {
+            $table->string('DID')->primary();
+            $table->string('FS')->nullable();
+            $table->string('BZ')->nullable();
+            $table->string('DWMC')->nullable();
+            $table->string('KHDJ')->nullable();
+            $table->string('XM')->nullable();
+            $table->string('GH')->nullable();
+            $table->string('XN')->nullable();
+        });
+    }
+}

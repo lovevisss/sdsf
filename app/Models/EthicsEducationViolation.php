@@ -18,6 +18,7 @@ class EthicsEducationViolation extends Model
         'staff_no',
         'staff_name',
         'staff_unit_name',
+        'academic_year',
         'violation_type',
         'violation_at',
         'deduction_points',
@@ -47,4 +48,3 @@ class EthicsEducationViolation extends Model
         return $this->belongsTo(User::class, 'recorder_user_id');
     }
 }
-
