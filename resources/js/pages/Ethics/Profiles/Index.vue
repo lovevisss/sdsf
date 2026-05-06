@@ -20,6 +20,12 @@
               <option value="">全部部门</option>
               <option v-for="item in props.departmentOptions" :key="item.code" :value="item.code">{{ item.name }}</option>
             </select>
+            <input
+              v-model="name"
+              type="text"
+              placeholder="按姓名模糊搜索"
+              class="rounded-md border border-gray-300 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-900 dark:text-white"
+            />
             <button
               type="button"
               class="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
@@ -41,11 +47,16 @@
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">工号</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">姓名</th>
                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">单位</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">最近年份</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">思政</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">教育</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">学术</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">师表</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
               <tr v-if="props.staffRecords.data.length === 0">
-                <td colspan="3" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">暂无档案数据</td>
+                <td colspan="8" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">暂无档案数据</td>
               </tr>
               <tr v-for="item in props.staffRecords.data" :key="item.staff_no" class="hover:bg-gray-50 dark:hover:bg-gray-700">
                 <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">{{ item.staff_no }}</td>
@@ -53,6 +64,11 @@
                   <Link :href="item.profile_url" class="text-blue-600 hover:underline dark:text-blue-400">{{ item.name }}</Link>
                 </td>
                 <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ item.unit_name ?? '-' }}</td>
+                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ item.latest_year }}</td>
+                <td class="px-4 py-3 text-sm" :class="scoreClass(item.latest_scores?.political)">{{ item.latest_scores?.political ?? 25 }}</td>
+                <td class="px-4 py-3 text-sm" :class="scoreClass(item.latest_scores?.education)">{{ item.latest_scores?.education ?? 25 }}</td>
+                <td class="px-4 py-3 text-sm" :class="scoreClass(item.latest_scores?.academic)">{{ item.latest_scores?.academic ?? 25 }}</td>
+                <td class="px-4 py-3 text-sm" :class="scoreClass(item.latest_scores?.professional)">{{ item.latest_scores?.professional ?? 25 }}</td>
               </tr>
             </tbody>
           </table>
@@ -72,6 +88,13 @@ type ProfileRow = {
   name?: string
   unit_name?: string
   profile_url: string
+  latest_year?: number
+  latest_scores?: {
+    political: number
+    education: number
+    academic: number
+    professional: number
+  }
 }
 
 type DepartmentOption = {
@@ -84,18 +107,38 @@ const props = defineProps<{
     data: ProfileRow[]
   }
   departmentFilter?: string
+  nameFilter?: string
   departmentOptions: DepartmentOption[]
 }>()
 
 const department = ref(props.departmentFilter ?? '')
+const name = ref(props.nameFilter ?? '')
 
 const applyDepartmentFilter = (): void => {
-  router.get('/ethics/profiles', { department: department.value || undefined }, { preserveState: true })
+  router.get('/ethics/profiles', {
+    department: department.value || undefined,
+    name: name.value || undefined,
+  }, { preserveState: true })
 }
 
 const clearDepartmentFilter = (): void => {
   department.value = ''
+  name.value = ''
   router.get('/ethics/profiles', {}, { preserveState: false })
+}
+
+const scoreClass = (score?: number): string => {
+  const value = score ?? 25
+
+  if (value < 15) {
+    return 'font-semibold text-red-600 dark:text-red-400'
+  }
+
+  if (value < 20) {
+    return 'font-semibold text-yellow-600 dark:text-yellow-400'
+  }
+
+  return 'text-gray-700 dark:text-gray-300'
 }
 </script>
 

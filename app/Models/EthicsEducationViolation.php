@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -46,5 +47,19 @@ class EthicsEducationViolation extends Model
     public function recorder(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorder_user_id');
+    }
+
+    public function scopeForAnnualYear(Builder $query, int $year): Builder
+    {
+        $yearString = (string) $year;
+
+        return $query->where(function (Builder $builder) use ($year, $yearString): void {
+            $builder->where('academic_year', $yearString)
+                ->orWhere('academic_year', 'like', $yearString.'-%')
+                ->orWhere(function (Builder $fallbackQuery) use ($year): void {
+                    $fallbackQuery->whereNull('academic_year')
+                        ->whereYear('violation_at', $year);
+                });
+        });
     }
 }

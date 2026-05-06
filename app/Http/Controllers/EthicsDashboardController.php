@@ -30,7 +30,7 @@ class EthicsDashboardController extends Controller
         $profileQuery = EthicsProfile::query();
         $warningQuery = EthicsWarning::query();
         $politicalViolationQuery = EthicsPoliticalViolation::query()->whereYear('violation_at', $year);
-        $educationViolationQuery = EthicsEducationViolation::query()->whereYear('violation_at', $year);
+        $educationViolationQuery = EthicsEducationViolation::query()->forAnnualYear($year);
         $academicViolationQuery = EthicsAcademicViolation::query()->whereYear('violation_at', $year);
         $professionalViolationQuery = EthicsProfessionalViolation::query()->whereYear('violation_at', $year);
 

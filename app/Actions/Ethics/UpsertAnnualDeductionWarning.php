@@ -76,7 +76,7 @@ class UpsertAnnualDeductionWarning
 
         $education = (float) EthicsEducationViolation::query()
             ->where('staff_no', $staffNo)
-            ->whereYear('violation_at', $year)
+            ->forAnnualYear($year)
             ->sum('deduction_points');
 
         $academic = (float) EthicsAcademicViolation::query()

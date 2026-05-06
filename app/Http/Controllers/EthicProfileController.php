@@ -12,6 +12,7 @@ use App\Models\Staff;
 use App\Models\TeacherEvaluation;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -23,7 +24,7 @@ class EthicProfileController extends Controller
         $this->authorize('viewAny', EthicsProfile::class);
 
         $departmentFilter = trim((string) $request->query('department', ''));
-//        dd($departmentFilter);
+        $nameFilter = trim((string) $request->query('name', $request->query('unit', '')));
         $normalizedDepartmentFilter = strtoupper($departmentFilter);
 
         try {
@@ -46,7 +47,6 @@ class EthicProfileController extends Controller
                 ->where('code', '!=', '')
                 ->orderBy('name')
                 ->whereIn('code', $staffDepartmentCodes);
-//            dd($departmentQuery->get());
             $departments = $departmentQuery->get();
 
             if ($departments->isEmpty()) {
@@ -66,11 +66,16 @@ class EthicProfileController extends Controller
                 ])
                 ->values()
                 ->all();
-            if($normalizedDepartmentFilter == ""){
-                $staffQuery = Staff::where('xbm' ,'!=', '0');
-            }else{
-                $staffQuery = Staff::where('szdwbm', $normalizedDepartmentFilter);
+            $staffQuery = Staff::query();
+
+            if ($normalizedDepartmentFilter !== '') {
+                $staffQuery->whereRaw('UPPER(TRIM(szdwbm)) = ?', [$normalizedDepartmentFilter]);
             }
+
+            if ($nameFilter !== '') {
+                $staffQuery->where('xm', 'like', "%{$nameFilter}%");
+            }
+
             $staffRecords = $staffQuery
                 ->paginate(20)
                 ->through(function (Staff $staff) use ($departmentMap): array {
@@ -84,6 +89,8 @@ class EthicProfileController extends Controller
                     ];
                 })
                 ->withQueryString();
+
+            $staffRecords = $this->appendLatestModuleScores($staffRecords);
         } catch (\Throwable) {
             $departments = Department::query()
                 ->select(['id', 'code', 'name'])
@@ -109,6 +116,12 @@ class EthicProfileController extends Controller
                 });
             }
 
+            if ($nameFilter !== '') {
+                $profiles->whereHas('user', function ($query) use ($nameFilter): void {
+                    $query->where('name', 'like', "%{$nameFilter}%");
+                });
+            }
+
             $staffRecords = $profiles
                 ->paginate(20)
                 ->through(function (EthicsProfile $profile): array {
@@ -120,15 +133,114 @@ class EthicProfileController extends Controller
                     ];
                 })
                 ->withQueryString();
-        }
 
-//        dd($staffRecords);
+            $staffRecords = $this->appendLatestModuleScores($staffRecords);
+        }
 
         return Inertia::render('Ethics/Profiles/Index', [
             'staffRecords' => $staffRecords,
             'departmentFilter' => $departmentFilter,
+            'nameFilter' => $nameFilter,
             'departmentOptions' => $departmentOptions,
         ]);
+    }
+
+    private function appendLatestModuleScores(LengthAwarePaginator $staffRecords): LengthAwarePaginator
+    {
+        $rows = collect($staffRecords->items())
+            ->map(fn (mixed $row): array => is_array($row) ? $row : (array) $row);
+
+        $staffNos = $rows
+            ->pluck('staff_no')
+            ->filter(fn (mixed $staffNo): bool => is_string($staffNo) && $staffNo !== '')
+            ->values()
+            ->all();
+
+        if ($staffNos === []) {
+            return $staffRecords;
+        }
+
+        $political = $this->deductionsByStaffAndYear(EthicsPoliticalViolation::class, $staffNos);
+        $education = $this->deductionsByStaffAndYear(EthicsEducationViolation::class, $staffNos);
+        $academic = $this->deductionsByStaffAndYear(EthicsAcademicViolation::class, $staffNos);
+        $professional = $this->deductionsByStaffAndYear(EthicsProfessionalViolation::class, $staffNos);
+
+        $enriched = $rows->map(function (array $row) use ($political, $education, $academic, $professional): array {
+            $staffNo = (string) ($row['staff_no'] ?? '');
+
+            $years = collect([
+                ...array_keys($political[$staffNo] ?? []),
+                ...array_keys($education[$staffNo] ?? []),
+                ...array_keys($academic[$staffNo] ?? []),
+                ...array_keys($professional[$staffNo] ?? []),
+            ])->map(fn (mixed $value): int => (int) $value)
+                ->filter(fn (int $value): bool => $value > 0)
+                ->sortDesc()
+                ->values();
+
+            $latestYear = (int) ($years->first() ?? now()->year);
+
+            $politicalDeduction = (float) ($political[$staffNo][$latestYear] ?? 0.0);
+            $educationDeduction = (float) ($education[$staffNo][$latestYear] ?? 0.0);
+            $academicDeduction = (float) ($academic[$staffNo][$latestYear] ?? 0.0);
+            $professionalDeduction = (float) ($professional[$staffNo][$latestYear] ?? 0.0);
+
+            return [
+                ...$row,
+                'latest_year' => $latestYear,
+                'latest_scores' => [
+                    'political' => max(0, round(25 - $politicalDeduction, 2)),
+                    'education' => max(0, round(25 - $educationDeduction, 2)),
+                    'academic' => max(0, round(25 - $academicDeduction, 2)),
+                    'professional' => max(0, round(25 - $professionalDeduction, 2)),
+                ],
+            ];
+        });
+
+        $staffRecords->setCollection($enriched);
+
+        return $staffRecords;
+    }
+
+    /**
+     * @param class-string<EthicsPoliticalViolation|EthicsEducationViolation|EthicsAcademicViolation|EthicsProfessionalViolation> $modelClass
+     * @param array<int, string> $staffNos
+     * @return array<string, array<int, float>>
+     */
+    private function deductionsByStaffAndYear(string $modelClass, array $staffNos): array
+    {
+        $columns = ['staff_no', 'violation_at', 'deduction_points'];
+
+        if ($modelClass === EthicsEducationViolation::class) {
+            $columns[] = 'academic_year';
+        }
+
+        $rows = $modelClass::query()
+            ->whereIn('staff_no', $staffNos)
+            ->select($columns)
+            ->get();
+
+        $totals = [];
+
+        foreach ($rows as $row) {
+            $staffNo = (string) $row->staff_no;
+
+            if ($staffNo === '') {
+                continue;
+            }
+
+            $year = $modelClass === EthicsEducationViolation::class
+                ? $this->resolveEducationAnnualYear($row)
+                : $this->resolveCalendarYearFromViolationAt((string) $row->violation_at);
+
+            if ($year < 1) {
+                continue;
+            }
+
+            $totals[$staffNo][$year] = (float) ($totals[$staffNo][$year] ?? 0.0) + (float) $row->deduction_points;
+        }
+
+        return $totals;
     }
 
     public function show(Request $request, User $user): Response
@@ -189,12 +301,10 @@ class EthicProfileController extends Controller
 
         $educationByYear = EthicsEducationViolation::query()
             ->where('staff_no', $staffNo)
-            ->select(['violation_at', 'deduction_points'])
+            ->select(['academic_year', 'violation_at', 'deduction_points'])
             ->get()
             ->groupBy(function (EthicsEducationViolation $row): int {
-                $timestamp = strtotime((string) $row->violation_at);
-
-                return $timestamp !== false ? (int) date('Y', $timestamp) : 0;
+                return $this->resolveEducationAnnualYear($row);
             })
             ->map(fn ($items): float => (float) collect($items)->sum('deduction_points'));
 
@@ -224,12 +334,10 @@ class EthicProfileController extends Controller
             ->where('staff_no', $staffNo)
             ->where('violation_type', 10)
             ->where('notes', '教师评价后10%')
-            ->select(['violation_at'])
+            ->select(['academic_year', 'violation_at'])
             ->get()
             ->groupBy(function (EthicsEducationViolation $row): int {
-                $timestamp = strtotime((string) $row->violation_at);
-
-                return $timestamp !== false ? (int) date('Y', $timestamp) : 0;
+                return $this->resolveEducationAnnualYear($row);
             })
             ->map(fn ($items): int => (int) count($items));
 
@@ -315,6 +423,7 @@ class EthicProfileController extends Controller
             ->all();
 
         $currentYearSummary = $buildSummary($year);
+        $deductionRecords = $this->buildDeductionRecords($staffNo);
 
         return Inertia::render('Ethics/Profiles/Show', [
             'profile' => [
@@ -326,7 +435,176 @@ class EthicProfileController extends Controller
                 ...$currentYearSummary,
             ],
             'yearlySummaries' => $yearlySummaries,
+            'deductionRecords' => $deductionRecords,
         ]);
+    }
+
+    /**
+     * @return array<int, array{
+     *     module: string,
+     *     module_key: string,
+     *     violation_type: int,
+     *     violation_type_label: string,
+     *     violation_at: string,
+     *     deduction_points: float,
+     *     notes: string|null,
+     *     recorder_name: string|null
+     * }>
+     */
+    private function buildDeductionRecords(string $staffNo): array
+    {
+        $politicalRecords = EthicsPoliticalViolation::query()
+            ->with('recorder:id,name')
+            ->where('staff_no', $staffNo)
+            ->get()
+            ->map(fn (EthicsPoliticalViolation $row): array => [
+                'module' => '思想政治素养',
+                'module_key' => 'political',
+                'violation_type' => (int) $row->violation_type,
+                'violation_type_label' => $this->politicalTypeLabel((int) $row->violation_type),
+                'violation_at' => (string) $row->violation_at,
+                'deduction_points' => round((float) $row->deduction_points, 2),
+                'notes' => $row->notes,
+                'recorder_name' => $row->recorder?->name,
+            ]);
+
+        $educationRecords = EthicsEducationViolation::query()
+            ->with('recorder:id,name')
+            ->where('staff_no', $staffNo)
+            ->get()
+            ->map(fn (EthicsEducationViolation $row): array => [
+                'module' => '教育教学行为',
+                'module_key' => 'education',
+                'violation_type' => (int) $row->violation_type,
+                'violation_type_label' => $this->educationTypeLabel((int) $row->violation_type),
+                'violation_at' => (string) $row->violation_at,
+                'deduction_points' => round((float) $row->deduction_points, 2),
+                'notes' => $row->notes,
+                'recorder_name' => $row->recorder?->name,
+            ]);
+
+        $academicRecords = EthicsAcademicViolation::query()
+            ->with('recorder:id,name')
+            ->where('staff_no', $staffNo)
+            ->get()
+            ->map(fn (EthicsAcademicViolation $row): array => [
+                'module' => '学术科研道德',
+                'module_key' => 'academic',
+                'violation_type' => (int) $row->violation_type,
+                'violation_type_label' => $this->academicTypeLabel((int) $row->violation_type),
+                'violation_at' => (string) $row->violation_at,
+                'deduction_points' => round((float) $row->deduction_points, 2),
+                'notes' => $row->notes,
+                'recorder_name' => $row->recorder?->name,
+            ]);
+
+        $professionalRecords = EthicsProfessionalViolation::query()
+            ->with('recorder:id,name')
+            ->where('staff_no', $staffNo)
+            ->get()
+            ->map(fn (EthicsProfessionalViolation $row): array => [
+                'module' => '为人师表',
+                'module_key' => 'professional',
+                'violation_type' => (int) $row->violation_type,
+                'violation_type_label' => $this->professionalTypeLabel((int) $row->violation_type),
+                'violation_at' => (string) $row->violation_at,
+                'deduction_points' => round((float) $row->deduction_points, 2),
+                'notes' => $row->notes,
+                'recorder_name' => $row->recorder?->name,
+            ]);
+
+        return collect()
+            ->merge($politicalRecords)
+            ->merge($educationRecords)
+            ->merge($academicRecords)
+            ->merge($professionalRecords)
+            ->sortByDesc(function (array $item): int {
+                $timestamp = strtotime($item['violation_at']);
+
+                return $timestamp !== false ? $timestamp : 0;
+            })
+            ->values()
+            ->all();
+    }
+
+    private function politicalTypeLabel(int $type): string
+    {
+        return [
+            1 => '损害党中央权威，违背路线方针政策',
+            2 => '损害国家/社会/学院/学生合法权益',
+            3 => '涉外活动危害国家安全和尊严利益',
+            4 => '违反保密规定导致泄密',
+            5 => '校园内外组织或参与非法宗教活动',
+            6 => '传播低俗文化或非法/违禁出版物',
+            7 => '宣传或参与封建迷信、邪教活动',
+        ][$type] ?? "类型{$type}";
+    }
+
+    private function educationTypeLabel(int $type): string
+    {
+        return [
+            8 => '课堂及网络发表、转发错误观点或散布虚假/不良信息',
+            9 => '无故不承担教学任务或3次及以上拒绝学院分配工作',
+            10 => '违反教学纪律、敷衍教学或违规兼职兼薪',
+            11 => '违反考试（评卷）管理规定影响公平公正',
+            12 => '讽刺、侮辱、歧视、体罚或变相体罚学生',
+            13 => '要求学生从事与教学科研社会服务无关事项',
+            14 => '突发事件中不顾学生安危擅离职守',
+            15 => '从事不利于学生身心健康成长的活动或言行',
+        ][$type] ?? "类型{$type}";
+    }
+
+    private function academicTypeLabel(int $type): string
+    {
+        return [
+            16 => '伪造学历、学位、资历、成果等行为',
+            17 => '违规使用科研经费，牟取不正当利益',
+            18 => '科研弄虚作假、抄袭剽窃、篡改成果数据等',
+            19 => '成果署名不当、一稿多投或重复发表申报',
+            20 => '滥用学术资源和影响干扰他人科研活动',
+            21 => '参与隐匿学术劣迹或学术造假',
+            22 => '评审考核中捏造事实、虚假学术信息、恶意诬告',
+        ][$type] ?? "类型{$type}";
+    }
+
+    private function professionalTypeLabel(int $type): string
+    {
+        return [
+            23 => '不执行、不落实学院重大决策与部署',
+            24 => '造谣传谣，侮辱诽谤和人身攻击他人',
+            25 => '组织参与非法集会、违法上访等活动',
+            26 => '辱骂殴打威胁学院工作人员，扰乱秩序',
+            27 => '性骚扰、猥亵、虐待或与学生不正当关系',
+            28 => '群组管理失责导致违法违规信息传播',
+            29 => '组织参与黄赌毒及传销活动',
+            30 => '擅自利用学院资产资源谋取私利',
+            31 => '招生招聘评审等徇私舞弊弄虚作假',
+            32 => '利用职务向学生家长索要收受财物',
+            33 => '向学生家长推销牟利或利用家长资源谋私',
+            34 => '其他有损教师职业声誉的言行',
+        ][$type] ?? "类型{$type}";
+    }
+
+    private function resolveEducationAnnualYear(EthicsEducationViolation $row): int
+    {
+        $academicYear = trim((string) ($row->academic_year ?? ''));
+
+        if ($academicYear !== '' && preg_match('/(\d{4})/', $academicYear, $matches) === 1) {
+            return (int) $matches[1];
+        }
+
+        return $this->resolveCalendarYearFromViolationAt((string) $row->violation_at);
+    }
+
+    private function resolveCalendarYearFromViolationAt(string $violationAt): int
+    {
+        $timestamp = strtotime($violationAt);
+
+        if ($timestamp === false) {
+            return 0;
+        }
+
+        return (int) date('Y', $timestamp);
     }
 
     public function legacyShow(string $id): Response

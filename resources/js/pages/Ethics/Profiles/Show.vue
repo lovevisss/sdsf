@@ -81,6 +81,37 @@
             </tbody>
           </table>
         </div>
+
+        <div class="overflow-hidden rounded-lg bg-white shadow dark:bg-gray-800">
+          <div class="border-b border-gray-200 px-4 py-3 text-sm font-medium text-gray-700 dark:border-gray-700 dark:text-gray-300">
+            扣分明细（按时间倒序）
+          </div>
+          <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-900">
+              <tr>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">时间</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">模块</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">违规类型</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">扣分</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">备注</th>
+                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400">登记人</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+              <tr v-if="props.deductionRecords.length === 0">
+                <td colspan="6" class="px-4 py-6 text-center text-sm text-gray-500 dark:text-gray-400">暂无扣分明细</td>
+              </tr>
+              <tr v-for="(item, index) in props.deductionRecords" :key="`${item.module_key}-${item.violation_at}-${index}`">
+                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ formatDate(item.violation_at) }}</td>
+                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ item.module }}</td>
+                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ item.violation_type }}. {{ item.violation_type_label }}</td>
+                <td class="px-4 py-3 text-sm font-semibold text-red-600 dark:text-red-400">-{{ item.deduction_points }}</td>
+                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ item.notes ?? '-' }}</td>
+                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300">{{ item.recorder_name ?? '-' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   </AppLayout>
@@ -126,6 +157,20 @@ const props = defineProps<{
     automaticLowEvaluationCount: number
     totalScore: number
   }>
+  deductionRecords: Array<{
+    module: string
+    module_key: string
+    violation_type: number
+    violation_type_label: string
+    violation_at: string
+    deduction_points: number
+    notes?: string | null
+    recorder_name?: string | null
+  }>
 }>()
+
+const formatDate = (value: string): string => {
+  return new Date(value).toLocaleString('zh-CN')
+}
 </script>
 

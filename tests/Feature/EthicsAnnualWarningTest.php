@@ -25,7 +25,7 @@ class EthicsAnnualWarningTest extends TestCase
             'staff_name' => 'Teacher Yellow',
             'staff_unit_name' => 'Test Department',
             'violation_type' => 10,
-            'violation_at' => '2026-04-01 10:00:00',
+            'violation_at' => '2026-10-01 10:00:00',
             'deduction_points' => 2,
         ])->assertRedirect();
 
@@ -34,7 +34,7 @@ class EthicsAnnualWarningTest extends TestCase
             'staff_name' => 'Teacher Yellow',
             'staff_unit_name' => 'Test Department',
             'violation_type' => 1,
-            'violation_at' => '2026-04-02 10:00:00',
+            'violation_at' => '2026-10-02 10:00:00',
             'deduction_points' => 3,
         ])->assertRedirect();
 
@@ -58,7 +58,7 @@ class EthicsAnnualWarningTest extends TestCase
             'staff_name' => 'Teacher Red',
             'staff_unit_name' => 'Test Department',
             'violation_type' => 10,
-            'violation_at' => '2026-04-01 10:00:00',
+            'violation_at' => '2026-10-01 10:00:00',
             'deduction_points' => 5,
         ])->assertRedirect();
 
@@ -67,7 +67,7 @@ class EthicsAnnualWarningTest extends TestCase
             'staff_name' => 'Teacher Red',
             'staff_unit_name' => 'Test Department',
             'violation_type' => 2,
-            'violation_at' => '2026-04-02 10:00:00',
+            'violation_at' => '2026-10-02 10:00:00',
             'deduction_points' => 5,
         ])->assertRedirect();
 
@@ -79,6 +79,57 @@ class EthicsAnnualWarningTest extends TestCase
 
         $this->assertCount(1, $warnings);
         $this->assertSame('red', $warnings->first()->warning_level);
+    }
+
+    public function test_it_does_not_create_current_year_warning_for_historical_academic_year_education_record(): void
+    {
+        [$leader, $profile] = $this->createLeaderAndProfile('W-HISTORY-01');
+
+        $this->actingAs($leader)->post('/ethics/education-violations', [
+            'staff_no' => 'W-HISTORY-01',
+            'staff_name' => 'Teacher History',
+            'staff_unit_name' => 'Test Department',
+            'academic_year' => '2014-2015',
+            'violation_type' => 10,
+            'violation_at' => '2026-04-01 10:00:00',
+            'deduction_points' => 6,
+            'notes' => '历史学年补录',
+        ])->assertRedirect();
+
+        $warning = EthicsWarning::query()
+            ->where('ethics_profile_id', $profile->id)
+            ->where('source_type', 'teaching')
+            ->where('reason', 'like', 'AUTO_YEARLY_DEDUCTION|2026|%')
+            ->first();
+
+        $this->assertNull($warning);
+    }
+
+    public function test_dashboard_education_total_excludes_historical_academic_year_records_for_selected_year(): void
+    {
+        [$leader, $profile] = $this->createLeaderAndProfile('W-HISTORY-02');
+
+        EthicsEducationViolation::factory()->create([
+            'ethics_profile_id' => $profile->id,
+            'violator_user_id' => $profile->user_id,
+            'recorder_user_id' => $leader->id,
+            'staff_no' => 'W-HISTORY-02',
+            'staff_name' => 'Teacher History 2',
+            'staff_unit_name' => 'Test Department',
+            'academic_year' => '2014-2015',
+            'violation_type' => 10,
+            'violation_at' => '2026-04-01 10:00:00',
+            'deduction_points' => 6,
+        ]);
+
+        $this->actingAs($leader)
+            ->get('/ethics/dashboard?year=2026&staff_no=W-HISTORY-02')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('Ethics/Dashboard')
+                ->where('stats.educationViolationCount', 0)
+                ->where('stats.educationSelectedDeductionTotal', 0)
+            );
     }
 
     public function test_scoring_page_staff_summary_includes_profile_link(): void
@@ -128,6 +179,7 @@ class EthicsAnnualWarningTest extends TestCase
             'staff_no' => 'W-DASH-RED',
             'staff_name' => 'Teacher Red',
             'staff_unit_name' => 'Test Department',
+            'academic_year' => '2026-2027',
             'violation_type' => 10,
             'violation_at' => '2026-04-10 10:00:00',
             'deduction_points' => 6,
@@ -152,6 +204,7 @@ class EthicsAnnualWarningTest extends TestCase
             'staff_no' => 'W-DASH-YELLOW',
             'staff_name' => 'Teacher Yellow',
             'staff_unit_name' => 'Test Department',
+            'academic_year' => '2026-2027',
             'violation_type' => 10,
             'violation_at' => '2026-04-12 10:00:00',
             'deduction_points' => 6,

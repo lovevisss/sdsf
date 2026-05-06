@@ -3,10 +3,12 @@
 namespace Tests\Feature;
 
 use App\Models\Department;
+use App\Models\EthicsAcademicViolation;
 use App\Models\EthicsCase;
 use App\Models\EthicsEducationViolation;
 use App\Models\EthicsPoliticalViolation;
 use App\Models\EthicsProfile;
+use App\Models\EthicsProfessionalViolation;
 use App\Models\EthicsWarning;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -225,6 +227,78 @@ class EthicsGovernanceTest extends TestCase
             ->where('staffRecords.data.0.staff_no', 'FIN-STAFF-01')
             ->where('staffRecords.data.0.name', 'Finance Teacher')
             ->has('staffRecords.data', 1)
+        );
+    }
+
+    public function test_archive_supports_name_filter_and_latest_year_four_module_scores(): void
+    {
+        config()->set('database.connections.staff_db', [
+            'driver' => 'sqlite',
+            'database' => ':memory:',
+            'prefix' => '',
+            'foreign_key_constraints' => false,
+        ]);
+
+        DB::purge('staff_db');
+
+        $department = Department::factory()->create([
+            'name' => '信息技术部',
+            'code' => 'IT',
+        ]);
+
+        $leader = User::factory()->withoutTwoFactor()->create([
+            'role' => 'leader',
+            'department_id' => $department->id,
+        ]);
+
+        $teacher = User::factory()->withoutTwoFactor()->create([
+            'name' => '信息技术张老师',
+            'role' => 'advisor',
+            'department_id' => $department->id,
+        ]);
+
+        EthicsProfile::factory()->create([
+            'user_id' => $teacher->id,
+            'department_id' => $department->id,
+            'staff_no' => 'IT-ARCHIVE-01',
+        ]);
+
+        EthicsPoliticalViolation::factory()->create([
+            'staff_no' => 'IT-ARCHIVE-01',
+            'violation_at' => '2026-04-10 10:00:00',
+            'deduction_points' => 3,
+        ]);
+
+        EthicsEducationViolation::factory()->create([
+            'staff_no' => 'IT-ARCHIVE-01',
+            'violation_at' => '2026-04-10 10:00:00',
+            'deduction_points' => 2,
+        ]);
+
+        EthicsAcademicViolation::factory()->create([
+            'staff_no' => 'IT-ARCHIVE-01',
+            'violation_at' => '2026-04-10 10:00:00',
+            'deduction_points' => 1,
+        ]);
+
+        EthicsProfessionalViolation::factory()->create([
+            'staff_no' => 'IT-ARCHIVE-01',
+            'violation_at' => '2026-04-10 10:00:00',
+            'deduction_points' => 4,
+        ]);
+
+        $response = $this->actingAs($leader)->get('/ethics/profiles?name=张老');
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Ethics/Profiles/Index')
+            ->where('nameFilter', '张老')
+            ->where('staffRecords.data.0.staff_no', 'IT-ARCHIVE-01')
+            ->where('staffRecords.data.0.latest_year', 2026)
+            ->where('staffRecords.data.0.latest_scores.political', 22)
+            ->where('staffRecords.data.0.latest_scores.education', 23)
+            ->where('staffRecords.data.0.latest_scores.academic', 24)
+            ->where('staffRecords.data.0.latest_scores.professional', 21)
         );
     }
 
@@ -713,6 +787,7 @@ class EthicsGovernanceTest extends TestCase
             'staff_no' => 'P0001',
             'staff_name' => '老师甲',
             'staff_unit_name' => '测试学院',
+            'academic_year' => '2026-2027',
             'violation_at' => '2026-04-12 10:00:00',
             'deduction_points' => 5,
         ]);
@@ -741,6 +816,100 @@ class EthicsGovernanceTest extends TestCase
             ->has('yearlySummaries', 2)
             ->where('yearlySummaries.0.year', 2026)
             ->where('yearlySummaries.1.year', 2025)
+        );
+    }
+
+    public function test_profile_detail_shows_deduction_records_with_points(): void
+    {
+        $department = Department::factory()->create();
+
+        $advisor = User::factory()->withoutTwoFactor()->create([
+            'role' => 'advisor',
+            'department_id' => $department->id,
+        ]);
+
+        $profile = EthicsProfile::factory()->create([
+            'user_id' => $advisor->id,
+            'department_id' => $department->id,
+            'staff_no' => '20030139',
+        ]);
+
+        EthicsPoliticalViolation::factory()->create([
+            'ethics_profile_id' => $profile->id,
+            'violator_user_id' => $advisor->id,
+            'recorder_user_id' => $advisor->id,
+            'staff_no' => '20030139',
+            'staff_name' => '测试老师',
+            'violation_type' => 4,
+            'violation_at' => '2026-04-10 10:00:00',
+            'deduction_points' => 12,
+            'notes' => '保密违规',
+        ]);
+
+        EthicsProfessionalViolation::factory()->create([
+            'ethics_profile_id' => $profile->id,
+            'violator_user_id' => $advisor->id,
+            'recorder_user_id' => $advisor->id,
+            'staff_no' => '20030139',
+            'staff_name' => '测试老师',
+            'violation_type' => 31,
+            'violation_at' => '2026-04-11 10:00:00',
+            'deduction_points' => 18,
+            'notes' => '评审违规',
+        ]);
+
+        $response = $this->actingAs($advisor)->get('/ethics/profiles/staff/20030139?year=2026');
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Ethics/Profiles/Show')
+            ->has('deductionRecords', 2)
+            ->where('deductionRecords.0.module', '为人师表')
+            ->where('deductionRecords.0.deduction_points', 18)
+            ->where('deductionRecords.0.violation_type', 31)
+            ->where('deductionRecords.1.module', '思想政治素养')
+            ->where('deductionRecords.1.deduction_points', 12)
+            ->where('deductionRecords.1.violation_type', 4)
+        );
+    }
+
+    public function test_profile_detail_uses_academic_year_start_for_education_yearly_totals(): void
+    {
+        $department = Department::factory()->create();
+
+        $advisor = User::factory()->withoutTwoFactor()->create([
+            'role' => 'advisor',
+            'department_id' => $department->id,
+        ]);
+
+        $profile = EthicsProfile::factory()->create([
+            'user_id' => $advisor->id,
+            'department_id' => $department->id,
+            'staff_no' => '20030139',
+        ]);
+
+        EthicsEducationViolation::factory()->create([
+            'ethics_profile_id' => $profile->id,
+            'violator_user_id' => $advisor->id,
+            'recorder_user_id' => $advisor->id,
+            'staff_no' => '20030139',
+            'staff_name' => '测试老师',
+            'academic_year' => '2025-2026',
+            'violation_type' => 10,
+            'violation_at' => '2026-05-04 10:00:00',
+            'deduction_points' => 6,
+            'notes' => '历史学年补录',
+        ]);
+
+        $response = $this->actingAs($advisor)->get('/ethics/profiles/staff/20030139?year=2026');
+
+        $response->assertOk();
+        $response->assertInertia(fn (Assert $page) => $page
+            ->component('Ethics/Profiles/Show')
+            ->where('summary.year', 2026)
+            ->where('summary.educationAnnualDeductionTotal', 0)
+            ->where('yearlySummaries.1.year', 2025)
+            ->where('yearlySummaries.1.educationAnnualDeductionTotal', 6)
         );
     }
 }
