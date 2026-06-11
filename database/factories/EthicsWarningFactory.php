@@ -19,8 +19,8 @@ class EthicsWarningFactory extends Factory
         return [
             'ethics_profile_id' => EthicsProfile::factory(),
             'assignee_id' => User::factory(),
-            'warning_level' => $this->faker->randomElement(['yellow', 'orange', 'red']),
-            'source_type' => $this->faker->randomElement(['teaching', 'research', 'behavior', 'training', 'manual']),
+            'warning_level' => $this->faker->randomElement(['blue', 'yellow', 'red']),
+            'source_type' => $this->faker->randomElement(['teaching', 'research', 'behavior', 'training', 'manual', 'scoring', 'discipline']),
             'reason' => $this->faker->sentence(),
             'status' => 'open',
             'detected_at' => now(),
@@ -28,4 +28,3 @@ class EthicsWarningFactory extends Factory
         ];
     }
 }
-

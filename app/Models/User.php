@@ -125,6 +125,16 @@ class User extends Authenticatable
         return $this->hasMany(EthicsEducationViolation::class, 'recorder_user_id');
     }
 
+    public function disciplineViolations(): HasMany
+    {
+        return $this->hasMany(EthicsDisciplineViolation::class, 'violator_user_id');
+    }
+
+    public function recordedDisciplineViolations(): HasMany
+    {
+        return $this->hasMany(EthicsDisciplineViolation::class, 'recorder_user_id');
+    }
+
     /**
      * Get the attributes that should be cast.
      *

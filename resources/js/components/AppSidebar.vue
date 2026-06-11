@@ -14,7 +14,7 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, Folder, LayoutGrid } from 'lucide-vue-next';
+import { BookOpen, ClipboardList, FileDown, Folder, Gauge, LayoutGrid, ShieldAlert, UserRoundSearch } from 'lucide-vue-next';
 import AppLogo from './AppLogo.vue';
 
 const mainNavItems: NavItem[] = [
@@ -22,6 +22,31 @@ const mainNavItems: NavItem[] = [
         title: 'Dashboard',
         href: dashboard(),
         icon: LayoutGrid,
+    },
+    {
+        title: '师德治理中心',
+        href: '/ethics/dashboard',
+        icon: Gauge,
+    },
+    {
+        title: '师德档案',
+        href: '/ethics/profiles',
+        icon: UserRoundSearch,
+    },
+    {
+        title: '工作纪律录入',
+        href: '/ethics/discipline-violations',
+        icon: ShieldAlert,
+    },
+    {
+        title: '投诉处置',
+        href: '/ethics/cases',
+        icon: ClipboardList,
+    },
+    {
+        title: '报表导出',
+        href: '/ethics/reports/export?type=profile_details',
+        icon: FileDown,
     },
 ];
 

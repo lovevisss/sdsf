@@ -40,12 +40,12 @@ class EthicsAnnualWarningTest extends TestCase
 
         $warning = EthicsWarning::query()
             ->where('ethics_profile_id', $profile->id)
-            ->where('source_type', 'teaching')
+            ->where('source_type', 'scoring')
             ->latest('id')
             ->first();
 
         $this->assertNotNull($warning);
-        $this->assertSame('yellow', $warning->warning_level);
+        $this->assertSame('blue', $warning->warning_level);
         $this->assertStringStartsWith('AUTO_YEARLY_DEDUCTION|2026|', $warning->reason);
     }
 
@@ -73,12 +73,12 @@ class EthicsAnnualWarningTest extends TestCase
 
         $warnings = EthicsWarning::query()
             ->where('ethics_profile_id', $profile->id)
-            ->where('source_type', 'teaching')
+            ->where('source_type', 'scoring')
             ->where('reason', 'like', 'AUTO_YEARLY_DEDUCTION|2026|%')
             ->get();
 
         $this->assertCount(1, $warnings);
-        $this->assertSame('red', $warnings->first()->warning_level);
+        $this->assertSame('yellow', $warnings->first()->warning_level);
     }
 
     public function test_it_does_not_create_current_year_warning_for_historical_academic_year_education_record(): void
@@ -215,10 +215,10 @@ class EthicsAnnualWarningTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Ethics/Dashboard')
-                ->where('stats.redWarningPersonCount', 1)
-                ->where('stats.yellowWarningPersonCount', 1)
-                ->where('autoWarningPeople.red.0.staff_no', 'W-DASH-RED')
-                ->where('autoWarningPeople.yellow.0.staff_no', 'W-DASH-YELLOW')
+                ->where('stats.redWarningPersonCount', 0)
+                ->where('stats.yellowWarningPersonCount', 2)
+                ->where('autoWarningPeople.yellow.0.staff_no', 'W-DASH-RED')
+                ->where('autoWarningPeople.yellow.1.staff_no', 'W-DASH-YELLOW')
             );
     }
 
@@ -251,4 +251,3 @@ class EthicsAnnualWarningTest extends TestCase
         return [$leader, $profile];
     }
 }
-

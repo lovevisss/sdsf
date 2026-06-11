@@ -77,5 +77,9 @@ class EthicsProfile extends Model
     {
         return $this->hasMany(EthicsProfessionalViolation::class);
     }
-}
 
+    public function disciplineViolations(): HasMany
+    {
+        return $this->hasMany(EthicsDisciplineViolation::class);
+    }
+}

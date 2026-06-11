@@ -118,8 +118,8 @@ class EthicsExtendedModulesTest extends TestCase
                 ->component('Ethics/Profiles/Show')
                 ->where('summary.academicAnnualDeductionTotal', 4)
                 ->where('summary.professionalAnnualDeductionTotal', 3)
-                ->where('summary.modules.academic', 21)
-                ->where('summary.modules.professional', 22)
+                ->where('summary.modules.academic', 16)
+                ->where('summary.modules.professional', 17)
             );
     }
 

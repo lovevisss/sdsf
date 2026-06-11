@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Ethics\UpsertAnnualDeductionWarning;
+use App\Http\Controllers\Concerns\StoresEthicsViolation;
 use App\Http\Requests\StoreEthicsEducationViolationRequest;
 use App\Models\Department;
 use App\Models\EthicsEducationViolation;
@@ -16,7 +17,9 @@ use Inertia\Response;
 
 class EducationViolationController extends Controller
 {
-    private const MAX_EDUCATION_SCORE = 25.0;
+    use StoresEthicsViolation;
+
+    private const MAX_EDUCATION_SCORE = 20.0;
 
     public function __construct(private readonly UpsertAnnualDeductionWarning $upsertAnnualDeductionWarning)
     {
@@ -132,7 +135,7 @@ class EducationViolationController extends Controller
     {
         $this->authorize('create', EthicsEducationViolation::class);
 
-        $validated = $request->validated();
+        $validated = $this->prepareViolationPayload($request->validated(), $request);
         $profile = EthicsProfile::query()->where('staff_no', $validated['staff_no'])->first();
         $academicYear = $validated['academic_year'] ?? $this->academicYearFromDate((string) $validated['violation_at']);
 
@@ -144,9 +147,10 @@ class EducationViolationController extends Controller
             'recorder_user_id' => $request->user()->id,
         ]);
 
+        $warningYear = $this->firstYearOfAcademicYear($academicYear);
         $violationTimestamp = strtotime((string) $validated['violation_at']);
         $violationYear = $violationTimestamp !== false ? (int) date('Y', $violationTimestamp) : now()->year;
-        $this->upsertAnnualDeductionWarning->handle((string) $validated['staff_no'], $violationYear);
+        $this->upsertAnnualDeductionWarning->handle((string) $validated['staff_no'], $warningYear ?? $violationYear);
 
         return redirect()->route('ethics.education-violations.index', [
             'staff_no' => $validated['staff_no'],

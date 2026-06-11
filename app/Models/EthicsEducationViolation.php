@@ -21,8 +21,17 @@ class EthicsEducationViolation extends Model
         'staff_unit_name',
         'academic_year',
         'violation_type',
+        'severity_level',
         'violation_at',
         'deduction_points',
+        'data_source',
+        'handler_department',
+        'handler_user_id',
+        'deduction_basis',
+        'evidence_attachments',
+        'verification_status',
+        'verified_by',
+        'verified_at',
         'notes',
     ];
 
@@ -31,6 +40,8 @@ class EthicsEducationViolation extends Model
         return [
             'violation_at' => 'datetime',
             'deduction_points' => 'decimal:2',
+            'evidence_attachments' => 'array',
+            'verified_at' => 'datetime',
         ];
     }
 
@@ -47,6 +58,16 @@ class EthicsEducationViolation extends Model
     public function recorder(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorder_user_id');
+    }
+
+    public function handler(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'handler_user_id');
+    }
+
+    public function verifier(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'verified_by');
     }
 
     public function scopeForAnnualYear(Builder $query, int $year): Builder

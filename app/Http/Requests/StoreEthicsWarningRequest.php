@@ -18,8 +18,8 @@ class StoreEthicsWarningRequest extends FormRequest
         return [
             'ethics_profile_id' => ['required', 'exists:ethics_profiles,id'],
             'assignee_id' => ['nullable', 'exists:users,id'],
-            'warning_level' => ['required', 'in:yellow,orange,red'],
-            'source_type' => ['required', 'in:teaching,research,behavior,training,manual'],
+            'warning_level' => ['required', 'in:blue,yellow,orange,red'],
+            'source_type' => ['required', 'in:teaching,research,behavior,training,manual,scoring,discipline'],
             'reason' => ['required', 'string'],
         ];
     }
@@ -57,4 +57,3 @@ class StoreEthicsWarningRequest extends FormRequest
         });
     }
 }
-

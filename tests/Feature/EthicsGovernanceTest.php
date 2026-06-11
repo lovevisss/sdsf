@@ -271,6 +271,7 @@ class EthicsGovernanceTest extends TestCase
 
         EthicsEducationViolation::factory()->create([
             'staff_no' => 'IT-ARCHIVE-01',
+            'academic_year' => '2026',
             'violation_at' => '2026-04-10 10:00:00',
             'deduction_points' => 2,
         ]);
@@ -295,10 +296,11 @@ class EthicsGovernanceTest extends TestCase
             ->where('nameFilter', '张老')
             ->where('staffRecords.data.0.staff_no', 'IT-ARCHIVE-01')
             ->where('staffRecords.data.0.latest_year', 2026)
-            ->where('staffRecords.data.0.latest_scores.political', 22)
-            ->where('staffRecords.data.0.latest_scores.education', 23)
-            ->where('staffRecords.data.0.latest_scores.academic', 24)
-            ->where('staffRecords.data.0.latest_scores.professional', 21)
+            ->where('staffRecords.data.0.latest_scores.political', 17)
+            ->where('staffRecords.data.0.latest_scores.education', 18)
+            ->where('staffRecords.data.0.latest_scores.academic', 19)
+            ->where('staffRecords.data.0.latest_scores.professional', 16)
+            ->where('staffRecords.data.0.latest_scores.discipline', 20)
         );
     }
 
@@ -654,7 +656,7 @@ class EthicsGovernanceTest extends TestCase
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Ethics/Dashboard')
             ->where('stats.politicalSelectedDeductionTotal', 3)
-            ->where('stats.politicalSelectedRemainingScore', 22)
+            ->where('stats.politicalSelectedRemainingScore', 17)
         );
     }
 
@@ -696,6 +698,7 @@ class EthicsGovernanceTest extends TestCase
             'staff_no' => 'E0001',
             'staff_name' => '教师甲',
             'staff_unit_name' => '测试学院',
+            'academic_year' => '2026',
             'violation_at' => '2026-04-02 10:00:00',
             'deduction_points' => 5,
         ]);
@@ -728,7 +731,7 @@ class EthicsGovernanceTest extends TestCase
         $response->assertInertia(fn (Assert $page) => $page
             ->component('Ethics/Dashboard')
             ->where('stats.educationSelectedDeductionTotal', 5)
-            ->where('stats.educationSelectedRemainingScore', 20)
+            ->where('stats.educationSelectedRemainingScore', 15)
         );
     }
 
@@ -810,9 +813,9 @@ class EthicsGovernanceTest extends TestCase
             ->component('Ethics/Profiles/Show')
             ->where('summary.year', 2026)
             ->where('summary.politicalAnnualDeductionTotal', 4)
-            ->where('summary.politicalAnnualRemainingScore', 21)
+            ->where('summary.politicalAnnualRemainingScore', 16)
             ->where('summary.educationAnnualDeductionTotal', 5)
-            ->where('summary.educationAnnualRemainingScore', 20)
+            ->where('summary.educationAnnualRemainingScore', 15)
             ->has('yearlySummaries', 2)
             ->where('yearlySummaries.0.year', 2026)
             ->where('yearlySummaries.1.year', 2025)

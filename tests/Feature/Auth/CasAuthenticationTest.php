@@ -29,6 +29,10 @@ class CasAuthenticationTest extends TestCase
     public function test_user_can_sign_in_through_cas_callback(): void
     {
         config()->set('cas.base_url', 'https://cas.example.edu/cas');
+        config()->set('cas.id_attribute', 'gh');
+        config()->set('cas.name_attribute', 'name');
+        config()->set('cas.email_attribute', 'email');
+        config()->set('cas.email_domain', 'cas.local');
 
         Http::fake([
             'https://cas.example.edu/cas/serviceValidate*' => Http::response(<<<XML
@@ -81,4 +85,3 @@ XML),
         $this->assertGuest();
     }
 }
-

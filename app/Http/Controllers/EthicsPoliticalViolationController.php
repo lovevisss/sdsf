@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Ethics\UpsertAnnualDeductionWarning;
+use App\Http\Controllers\Concerns\StoresEthicsViolation;
 use App\Http\Requests\StoreEthicsPoliticalViolationRequest;
 use App\Models\EthicsPoliticalViolation;
 use App\Models\EthicsProfile;
@@ -14,7 +15,9 @@ use Inertia\Inertia;
 
 class EthicsPoliticalViolationController extends Controller
 {
-    private const MAX_POLITICAL_SCORE = 25.0;
+    use StoresEthicsViolation;
+
+    private const MAX_POLITICAL_SCORE = 20.0;
 
     public function __construct(private readonly UpsertAnnualDeductionWarning $upsertAnnualDeductionWarning)
     {
@@ -112,7 +115,7 @@ class EthicsPoliticalViolationController extends Controller
     {
         $this->authorize('create', EthicsPoliticalViolation::class);
 
-        $validated = $request->validated();
+        $validated = $this->prepareViolationPayload($request->validated(), $request);
 
         $profile = EthicsProfile::query()->where('staff_no', $validated['staff_no'])->first();
 
@@ -153,4 +156,3 @@ class EthicsPoliticalViolationController extends Controller
         }
     }
 }
-

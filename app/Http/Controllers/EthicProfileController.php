@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Department;
 use App\Models\EthicsProfile;
 use App\Models\EthicsAcademicViolation;
+use App\Models\EthicsDisciplineViolation;
 use App\Models\EthicsEducationViolation;
 use App\Models\EthicsPoliticalViolation;
 use App\Models\EthicsProfessionalViolation;
@@ -16,9 +17,14 @@ use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\Log;
 use Inertia\Inertia;
 use Inertia\Response;
+use App\Services\Ethics\EthicsScoreService;
 
 class EthicProfileController extends Controller
 {
+    public function __construct(private readonly EthicsScoreService $scoreService)
+    {
+    }
+
     public function index(Request $request): Response
     {
         $this->authorize('viewAny', EthicsProfile::class);
@@ -164,6 +170,7 @@ class EthicProfileController extends Controller
         $education = $this->deductionsByStaffAndYear(EthicsEducationViolation::class, $staffNos);
         $academic = $this->deductionsByStaffAndYear(EthicsAcademicViolation::class, $staffNos);
         $professional = $this->deductionsByStaffAndYear(EthicsProfessionalViolation::class, $staffNos);
+        $discipline = $this->deductionsByStaffAndYear(EthicsDisciplineViolation::class, $staffNos);
 
         $enriched = $rows->map(function (array $row) use ($political, $education, $academic, $professional): array {
             $staffNo = (string) ($row['staff_no'] ?? '');
@@ -173,6 +180,7 @@ class EthicProfileController extends Controller
                 ...array_keys($education[$staffNo] ?? []),
                 ...array_keys($academic[$staffNo] ?? []),
                 ...array_keys($professional[$staffNo] ?? []),
+                ...array_keys($discipline[$staffNo] ?? []),
             ])->map(fn (mixed $value): int => (int) $value)
                 ->filter(fn (int $value): bool => $value > 0)
                 ->sortDesc()
@@ -184,15 +192,17 @@ class EthicProfileController extends Controller
             $educationDeduction = (float) ($education[$staffNo][$latestYear] ?? 0.0);
             $academicDeduction = (float) ($academic[$staffNo][$latestYear] ?? 0.0);
             $professionalDeduction = (float) ($professional[$staffNo][$latestYear] ?? 0.0);
+            $disciplineDeduction = (float) ($discipline[$staffNo][$latestYear] ?? 0.0);
 
             return [
                 ...$row,
                 'latest_year' => $latestYear,
                 'latest_scores' => [
-                    'political' => max(0, round(25 - $politicalDeduction, 2)),
-                    'education' => max(0, round(25 - $educationDeduction, 2)),
-                    'academic' => max(0, round(25 - $academicDeduction, 2)),
-                    'professional' => max(0, round(25 - $professionalDeduction, 2)),
+                    'political' => max(0, round(20 - min(20, $politicalDeduction), 2)),
+                    'education' => max(0, round(20 - min(20, $educationDeduction), 2)),
+                    'academic' => max(0, round(20 - min(20, $academicDeduction), 2)),
+                    'professional' => max(0, round(20 - min(20, $professionalDeduction), 2)),
+                    'discipline' => max(0, round(20 - min(20, $disciplineDeduction), 2)),
                 ],
             ];
         });
@@ -203,7 +213,7 @@ class EthicProfileController extends Controller
     }
 
     /**
-     * @param class-string<EthicsPoliticalViolation|EthicsEducationViolation|EthicsAcademicViolation|EthicsProfessionalViolation> $modelClass
+     * @param class-string<EthicsPoliticalViolation|EthicsEducationViolation|EthicsAcademicViolation|EthicsProfessionalViolation|EthicsDisciplineViolation> $modelClass
      * @param array<int, string> $staffNos
      * @return array<string, array<int, float>>
      */
@@ -330,6 +340,17 @@ class EthicProfileController extends Controller
             })
             ->map(fn ($items): float => (float) collect($items)->sum('deduction_points'));
 
+        $disciplineByYear = EthicsDisciplineViolation::query()
+            ->where('staff_no', $staffNo)
+            ->select(['violation_at', 'deduction_points'])
+            ->get()
+            ->groupBy(function (EthicsDisciplineViolation $row): int {
+                $timestamp = strtotime((string) $row->violation_at);
+
+                return $timestamp !== false ? (int) date('Y', $timestamp) : 0;
+            })
+            ->map(fn ($items): float => (float) collect($items)->sum('deduction_points'));
+
         $automaticByYear = EthicsEducationViolation::query()
             ->where('staff_no', $staffNo)
             ->where('violation_type', 10)
@@ -376,6 +397,7 @@ class EthicProfileController extends Controller
             ...array_keys($educationByYear->all()),
             ...array_keys($academicByYear->all()),
             ...array_keys($professionalByYear->all()),
+            ...array_keys($disciplineByYear->all()),
             ...array_keys($automaticByYear->all()),
             ...array_keys($evaluationByYear->all()),
             $year,
@@ -385,35 +407,34 @@ class EthicProfileController extends Controller
             ->sortDesc()
             ->values();
 
-        $buildSummary = function (int $targetYear) use ($politicalByYear, $educationByYear, $academicByYear, $professionalByYear, $automaticByYear, $evaluationByYear): array {
+        $buildSummary = function (int $targetYear) use ($staffNo, $politicalByYear, $educationByYear, $academicByYear, $professionalByYear, $disciplineByYear, $automaticByYear, $evaluationByYear): array {
+            $scoreSummary = $this->scoreService->summary($staffNo, $targetYear);
             $politicalAnnualDeductionTotal = round((float) ($politicalByYear->get($targetYear, 0.0)), 2);
             $educationAnnualDeductionTotal = round((float) ($educationByYear->get($targetYear, 0.0)), 2);
             $academicAnnualDeductionTotal = round((float) ($academicByYear->get($targetYear, 0.0)), 2);
             $professionalAnnualDeductionTotal = round((float) ($professionalByYear->get($targetYear, 0.0)), 2);
+            $disciplineAnnualDeductionTotal = round((float) ($disciplineByYear->get($targetYear, 0.0)), 2);
             $teacherEvaluationAverage = round((float) ($evaluationByYear->get($targetYear, 0.0)), 2);
             $automaticLowEvaluationCount = (int) ($automaticByYear->get($targetYear, 0));
-
-            $modules = [
-                'political' => max(0, round(25 - $politicalAnnualDeductionTotal, 2)),
-                'education' => max(0, round(25 - $educationAnnualDeductionTotal, 2)),
-                'academic' => max(0, round(25 - $academicAnnualDeductionTotal, 2)),
-                'professional' => max(0, round(25 - $professionalAnnualDeductionTotal, 2)),
-            ];
 
             return [
                 'year' => $targetYear,
                 'politicalAnnualDeductionTotal' => $politicalAnnualDeductionTotal,
-                'politicalAnnualRemainingScore' => max(0, round(25 - $politicalAnnualDeductionTotal, 2)),
+                'politicalAnnualRemainingScore' => $scoreSummary['modules']['political'],
                 'educationAnnualDeductionTotal' => $educationAnnualDeductionTotal,
-                'educationAnnualRemainingScore' => max(0, round(25 - $educationAnnualDeductionTotal, 2)),
+                'educationAnnualRemainingScore' => $scoreSummary['modules']['education'],
                 'academicAnnualDeductionTotal' => $academicAnnualDeductionTotal,
-                'academicAnnualRemainingScore' => max(0, round(25 - $academicAnnualDeductionTotal, 2)),
+                'academicAnnualRemainingScore' => $scoreSummary['modules']['academic'],
                 'professionalAnnualDeductionTotal' => $professionalAnnualDeductionTotal,
-                'professionalAnnualRemainingScore' => max(0, round(25 - $professionalAnnualDeductionTotal, 2)),
+                'professionalAnnualRemainingScore' => $scoreSummary['modules']['professional'],
+                'disciplineAnnualDeductionTotal' => $disciplineAnnualDeductionTotal,
+                'disciplineAnnualRemainingScore' => $scoreSummary['modules']['discipline'],
                 'teacherEvaluationAverage' => $teacherEvaluationAverage,
                 'automaticLowEvaluationCount' => $automaticLowEvaluationCount,
-                'modules' => $modules,
-                'totalScore' => round(array_sum($modules), 2),
+                'modules' => $scoreSummary['modules'],
+                'cappedDeductions' => $scoreSummary['cappedDeductions'],
+                'warningLevel' => $scoreSummary['warningLevel'],
+                'totalScore' => $scoreSummary['totalScore'],
             ];
         };
 
@@ -513,11 +534,27 @@ class EthicProfileController extends Controller
                 'recorder_name' => $row->recorder?->name,
             ]);
 
+        $disciplineRecords = EthicsDisciplineViolation::query()
+            ->with('recorder:id,name')
+            ->where('staff_no', $staffNo)
+            ->get()
+            ->map(fn (EthicsDisciplineViolation $row): array => [
+                'module' => '工作纪律',
+                'module_key' => 'discipline',
+                'violation_type' => (int) $row->violation_type,
+                'violation_type_label' => $this->disciplineTypeLabel((int) $row->violation_type),
+                'violation_at' => (string) $row->violation_at,
+                'deduction_points' => round((float) $row->deduction_points, 2),
+                'notes' => $row->notes,
+                'recorder_name' => $row->recorder?->name,
+            ]);
+
         return collect()
             ->merge($politicalRecords)
             ->merge($educationRecords)
             ->merge($academicRecords)
             ->merge($professionalRecords)
+            ->merge($disciplineRecords)
             ->sortByDesc(function (array $item): int {
                 $timestamp = strtotime($item['violation_at']);
 
@@ -594,6 +631,17 @@ class EthicProfileController extends Controller
         }
 
         return $this->resolveCalendarYearFromViolationAt((string) $row->violation_at);
+    }
+
+    private function disciplineTypeLabel(int $type): string
+    {
+        return [
+            35 => '迟到早退、缺勤脱岗或未按规定履行请假手续',
+            36 => '未经审批办理或持有出国（境）证件',
+            37 => '私自出国（境）、擅自变更行程或逾期滞留不归',
+            38 => '违规校外兼职或未按要求报备',
+            39 => '其他违反学院工作纪律的行为',
+        ][$type] ?? "类型{$type}";
     }
 
     private function resolveCalendarYearFromViolationAt(string $violationAt): int

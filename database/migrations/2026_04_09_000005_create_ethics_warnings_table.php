@@ -12,8 +12,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('ethics_profile_id')->constrained()->cascadeOnDelete();
             $table->foreignId('assignee_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->enum('warning_level', ['yellow', 'orange', 'red']);
-            $table->enum('source_type', ['teaching', 'research', 'behavior', 'training', 'manual']);
+            $table->enum('warning_level', ['blue', 'yellow', 'orange', 'red']);
+            $table->enum('source_type', ['teaching', 'research', 'behavior', 'training', 'manual', 'scoring', 'discipline']);
             $table->text('reason');
             $table->enum('status', ['open', 'rectifying', 'closed'])->default('open');
             $table->timestamp('detected_at');
@@ -29,4 +29,3 @@ return new class extends Migration
         Schema::dropIfExists('ethics_warnings');
     }
 };
-

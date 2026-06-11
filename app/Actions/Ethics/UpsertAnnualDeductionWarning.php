@@ -2,16 +2,17 @@
 
 namespace App\Actions\Ethics;
 
-use App\Models\EthicsEducationViolation;
-use App\Models\EthicsPoliticalViolation;
-use App\Models\EthicsAcademicViolation;
-use App\Models\EthicsProfessionalViolation;
 use App\Models\EthicsProfile;
 use App\Models\EthicsWarning;
+use App\Services\Ethics\EthicsScoreService;
 
 class UpsertAnnualDeductionWarning
 {
     private const AUTO_REASON_PREFIX = 'AUTO_YEARLY_DEDUCTION';
+
+    public function __construct(private readonly EthicsScoreService $scoreService)
+    {
+    }
 
     public function handle(string $staffNo, int $year): void
     {
@@ -27,8 +28,8 @@ class UpsertAnnualDeductionWarning
             return;
         }
 
-        $annualDeductionTotal = $this->annualDeductionTotal($normalizedStaffNo, $year);
-        $targetLevel = $this->targetWarningLevel($annualDeductionTotal);
+        $summary = $this->scoreService->summary($normalizedStaffNo, $year);
+        $targetLevel = $summary['warningLevel'];
 
         if ($targetLevel === null) {
             return;
@@ -36,7 +37,7 @@ class UpsertAnnualDeductionWarning
 
         $existing = EthicsWarning::query()
             ->where('ethics_profile_id', $profile->id)
-            ->where('source_type', 'teaching')
+            ->where('source_type', 'scoring')
             ->where('reason', 'like', self::AUTO_REASON_PREFIX.'|'.$year.'|%')
             ->latest('id')
             ->first();
@@ -46,8 +47,8 @@ class UpsertAnnualDeductionWarning
                 'ethics_profile_id' => $profile->id,
                 'assignee_id' => $profile->user_id,
                 'warning_level' => $targetLevel,
-                'source_type' => 'teaching',
-                'reason' => $this->buildReason($year, $annualDeductionTotal, $targetLevel),
+                'source_type' => 'scoring',
+                'reason' => $this->buildReason($year, $summary, $targetLevel),
                 'status' => 'open',
                 'detected_at' => now(),
                 'closed_at' => null,
@@ -59,50 +60,12 @@ class UpsertAnnualDeductionWarning
         if ($this->isUpgrade($existing->warning_level, $targetLevel) || $existing->status === 'closed') {
             $existing->update([
                 'warning_level' => $this->isUpgrade($existing->warning_level, $targetLevel) ? $targetLevel : $existing->warning_level,
-                'reason' => $this->buildReason($year, $annualDeductionTotal, $targetLevel),
+                'reason' => $this->buildReason($year, $summary, $targetLevel),
                 'status' => 'open',
                 'detected_at' => now(),
                 'closed_at' => null,
             ]);
         }
-    }
-
-    private function annualDeductionTotal(string $staffNo, int $year): float
-    {
-        $political = (float) EthicsPoliticalViolation::query()
-            ->where('staff_no', $staffNo)
-            ->whereYear('violation_at', $year)
-            ->sum('deduction_points');
-
-        $education = (float) EthicsEducationViolation::query()
-            ->where('staff_no', $staffNo)
-            ->forAnnualYear($year)
-            ->sum('deduction_points');
-
-        $academic = (float) EthicsAcademicViolation::query()
-            ->where('staff_no', $staffNo)
-            ->whereYear('violation_at', $year)
-            ->sum('deduction_points');
-
-        $professional = (float) EthicsProfessionalViolation::query()
-            ->where('staff_no', $staffNo)
-            ->whereYear('violation_at', $year)
-            ->sum('deduction_points');
-
-        return round($political + $education + $academic + $professional, 2);
-    }
-
-    private function targetWarningLevel(float $annualDeductionTotal): ?string
-    {
-        if ($annualDeductionTotal >= 10) {
-            return 'red';
-        }
-
-        if ($annualDeductionTotal >= 5) {
-            return 'yellow';
-        }
-
-        return null;
     }
 
     private function isUpgrade(string $currentLevel, string $targetLevel): bool
@@ -113,24 +76,27 @@ class UpsertAnnualDeductionWarning
     private function rank(string $level): int
     {
         return match ($level) {
-            'yellow' => 1,
-            'orange' => 2,
+            'blue' => 1,
+            'yellow', 'orange' => 2,
             'red' => 3,
             default => 0,
         };
     }
 
-    private function buildReason(int $year, float $annualDeductionTotal, string $level): string
+    /**
+     * @param array<string, mixed> $summary
+     */
+    private function buildReason(int $year, array $summary, string $level): string
     {
-        $label = $level === 'red' ? '红色' : '黄色';
+        $label = ['blue' => '蓝色', 'yellow' => '黄色', 'red' => '红色'][$level] ?? $level;
 
         return sprintf(
-            '%s|%d|年度累计扣分%.2f分，达到%s预警阈值。',
+            '%s|%d|年度总分%.2f，年度封顶扣分%.2f，达到%s预警阈值。',
             self::AUTO_REASON_PREFIX,
             $year,
-            $annualDeductionTotal,
+            (float) $summary['totalScore'],
+            (float) $summary['totalDeduction'],
             $label,
         );
     }
 }
-

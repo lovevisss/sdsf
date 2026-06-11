@@ -6,9 +6,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class EthicsAcademicViolation extends Model
+class EthicsDisciplineViolation extends Model
 {
-    /** @use HasFactory<\Database\Factories\EthicsAcademicViolationFactory> */
+    /** @use HasFactory<\Database\Factories\EthicsDisciplineViolationFactory> */
     use HasFactory;
 
     protected $fillable = [

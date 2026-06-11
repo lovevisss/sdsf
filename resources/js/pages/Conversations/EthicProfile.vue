@@ -60,29 +60,12 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watchEffect } from 'vue';
-import Echo from 'laravel-echo';
-import Pusher from 'pusher-js';
+import { ref, onMounted } from 'vue';
 import axios from 'axios';
 
 const loading = ref(true);
 const error = ref(null);
 const profile = ref(null);
-
-// Configure Laravel Echo for real-time updates
-const echo = new Echo({
-  broadcaster: 'pusher',
-  key: 'your-pusher-key', // Replace with real Pusher Key
-  cluster: 'your-cluster',
-  encrypted: true,
-});
-
-echo.channel(`teacher-scores`)
-  .listen('.ScoreUpdated', (event) => {
-    if (event.teacherId === testId) {
-      profile.value.scores = event.updatedScores;
-    }
-  });
 
 // 测试ID，实际应由登录人或URL参数如route传入
 const testId = '20230001';

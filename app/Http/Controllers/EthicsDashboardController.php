@@ -3,18 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Models\EthicsAcademicViolation;
+use App\Models\EthicsDisciplineViolation;
 use App\Models\EthicsEducationViolation;
 use App\Models\EthicsPoliticalViolation;
 use App\Models\EthicsProfessionalViolation;
 use App\Models\EthicsProfile;
 use App\Models\EthicsWarning;
 use App\Models\Staff;
+use App\Services\Ethics\EthicsScoreService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class EthicsDashboardController extends Controller
 {
+    public function __construct(private readonly EthicsScoreService $scoreService)
+    {
+    }
+
     public function index(Request $request)
     {
         $user = $request->user();
@@ -27,187 +33,89 @@ class EthicsDashboardController extends Controller
             $selectedStaffNo = $user->ethicsProfile?->staff_no;
         }
 
-        $profileQuery = EthicsProfile::query();
         $warningQuery = EthicsWarning::query();
-        $politicalViolationQuery = EthicsPoliticalViolation::query()->whereYear('violation_at', $year);
-        $educationViolationQuery = EthicsEducationViolation::query()->forAnnualYear($year);
-        $academicViolationQuery = EthicsAcademicViolation::query()->whereYear('violation_at', $year);
-        $professionalViolationQuery = EthicsProfessionalViolation::query()->whereYear('violation_at', $year);
+        $violationQueries = $this->scopedViolationQueries($user, $year);
+        $staffNos = $this->staffNosFromQueries($violationQueries);
+        $profilesByStaffNo = EthicsProfile::query()
+            ->with(['user:id,name', 'department:id,name'])
+            ->whereIn('staff_no', $staffNos)
+            ->get()
+            ->keyBy('staff_no');
 
         if ($user->role === 'leader') {
-            $profileQuery->where('department_id', $user->department_id);
             $warningQuery->whereHas('profile', function (Builder $query) use ($user): void {
-                $query->where('department_id', $user->department_id);
-            });
-            $politicalViolationQuery->whereHas('profile', function (Builder $query) use ($user): void {
-                $query->where('department_id', $user->department_id);
-            });
-            $educationViolationQuery->whereHas('profile', function (Builder $query) use ($user): void {
-                $query->where('department_id', $user->department_id);
-            });
-            $academicViolationQuery->whereHas('profile', function (Builder $query) use ($user): void {
-                $query->where('department_id', $user->department_id);
-            });
-            $professionalViolationQuery->whereHas('profile', function (Builder $query) use ($user): void {
                 $query->where('department_id', $user->department_id);
             });
         }
 
         if ($user->role === 'advisor') {
-            $profileQuery->where('user_id', $user->id);
             $warningQuery->whereHas('profile', function (Builder $query) use ($user): void {
                 $query->where('user_id', $user->id);
             });
-            $politicalViolationQuery->where('violator_user_id', $user->id);
-            $educationViolationQuery->where('violator_user_id', $user->id);
-            $academicViolationQuery->where('violator_user_id', $user->id);
-            $professionalViolationQuery->where('violator_user_id', $user->id);
         }
 
-        $politicalSelectedQuery = clone $politicalViolationQuery;
-        $educationSelectedQuery = clone $educationViolationQuery;
-
-        if (is_string($selectedStaffNo) && $selectedStaffNo !== '') {
-            $politicalSelectedQuery->where('staff_no', $selectedStaffNo);
-            $educationSelectedQuery->where('staff_no', $selectedStaffNo);
-        } else {
-            $politicalSelectedQuery->whereRaw('1 = 0');
-            $educationSelectedQuery->whereRaw('1 = 0');
-        }
-
-        $politicalSelectedDeductionTotal = (float) $politicalSelectedQuery->sum('deduction_points');
-        $educationSelectedDeductionTotal = (float) $educationSelectedQuery->sum('deduction_points');
-
-        $academicSelectedQuery = clone $academicViolationQuery;
-        $professionalSelectedQuery = clone $professionalViolationQuery;
-
-        if (is_string($selectedStaffNo) && $selectedStaffNo !== '') {
-            $academicSelectedQuery->where('staff_no', $selectedStaffNo);
-            $professionalSelectedQuery->where('staff_no', $selectedStaffNo);
-        } else {
-            $academicSelectedQuery->whereRaw('1 = 0');
-            $professionalSelectedQuery->whereRaw('1 = 0');
-        }
-
-        $academicSelectedDeductionTotal = (float) $academicSelectedQuery->sum('deduction_points');
-        $professionalSelectedDeductionTotal = (float) $professionalSelectedQuery->sum('deduction_points');
-
-        $politicalTotals = (clone $politicalViolationQuery)
-            ->selectRaw('staff_no, SUM(deduction_points) as total_deduction')
-            ->groupBy('staff_no')
-            ->pluck('total_deduction', 'staff_no')
-            ->mapWithKeys(fn (mixed $value, mixed $staffNo): array => [
-                (string) $staffNo => (float) $value,
-            ]);
-//        dd($politicalTotals);
-        $educationTotals = (clone $educationViolationQuery)
-            ->selectRaw('staff_no, SUM(deduction_points) as total_deduction')
-            ->groupBy('staff_no')
-            ->pluck('total_deduction', 'staff_no')
-            ->mapWithKeys(fn (mixed $value, mixed $staffNo): array => [
-                (string) $staffNo => (float) $value,
-            ]);
-
-        $academicTotals = (clone $academicViolationQuery)
-            ->selectRaw('staff_no, SUM(deduction_points) as total_deduction')
-            ->groupBy('staff_no')
-            ->pluck('total_deduction', 'staff_no')
-            ->mapWithKeys(fn (mixed $value, mixed $staffNo): array => [
-                (string) $staffNo => (float) $value,
-            ]);
-
-        $professionalTotals = (clone $professionalViolationQuery)
-            ->selectRaw('staff_no, SUM(deduction_points) as total_deduction')
-            ->groupBy('staff_no')
-            ->pluck('total_deduction', 'staff_no')
-            ->mapWithKeys(fn (mixed $value, mixed $staffNo): array => [
-                (string) $staffNo => (float) $value,
-            ]);
-
-        $allStaffNos = collect([
-            ...array_keys($politicalTotals->all()),
-            ...array_keys($educationTotals->all()),
-            ...array_keys($academicTotals->all()),
-            ...array_keys($professionalTotals->all()),
-        ])->map(fn (mixed $staffNo): string => (string) $staffNo)
-            ->filter(fn (string $staffNo): bool => $staffNo !== '')
-            ->unique()
-            ->values();
-        $profilesByStaffNo = EthicsProfile::query()
-            ->with(['user:id,name'])
-            ->whereIn('staff_no', $allStaffNos)
-            ->get()
-            ->keyBy('staff_no');
-
-        $autoWarningPeople = $allStaffNos
-            ->map(function (string $staffNo) use ($politicalTotals, $educationTotals, $academicTotals, $professionalTotals, $profilesByStaffNo, $year): array {
-                $annualDeduction = round((float) (
-                    $politicalTotals->get($staffNo, 0.0)
-                    + $educationTotals->get($staffNo, 0.0)
-                    + $academicTotals->get($staffNo, 0.0)
-                    + $professionalTotals->get($staffNo, 0.0)
-                ), 2);
-
-                $warningLevel = null;
-
-                if ($annualDeduction >= 10) {
-                    $warningLevel = 'red';
-                } elseif ($annualDeduction >= 5) {
-                    $warningLevel = 'yellow';
-                }
-
+        $autoWarningPeople = $this->scoreService
+            ->summariesForStaffNos($staffNos, $year)
+            ->map(function (array $item) use ($profilesByStaffNo, $year): array {
+                $staffNo = $item['staff_no'];
+                $summary = $item['summary'];
                 $profile = $profilesByStaffNo->get($staffNo);
 
                 return [
                     'ethics_profile_id' => $profile?->id,
                     'staff_no' => $staffNo,
                     'name' => $profile?->user?->name,
-                    'warning_level' => $warningLevel,
-                    'status' => $warningLevel === null ? null : 'open',
+                    'unit_name' => $profile?->department?->name,
+                    'warning_level' => $summary['warningLevel'],
+                    'status' => $summary['warningLevel'] === null ? null : 'open',
                     'detected_at' => now(),
-                    'annual_deduction' => $annualDeduction,
-                    'profile_url' => $staffNo !== ''
-                        ? route('ethics.profiles.staff.show', ['staffNo' => $staffNo, 'year' => $year])
-                        : null,
+                    'annual_deduction' => $summary['totalDeduction'],
+                    'total_score' => $summary['totalScore'],
+                    'profile_url' => route('ethics.profiles.staff.show', ['staffNo' => $staffNo, 'year' => $year]),
                 ];
             })
-            ->filter(fn (array $item): bool => in_array($item['warning_level'], ['yellow', 'red'], true))
-            ->sortByDesc('annual_deduction')
-            ->values();
-        $redWarningPeople = $autoWarningPeople
-            ->where('warning_level', 'red')
-            ->values();
+            ->filter(fn (array $item): bool => in_array($item['warning_level'], ['blue', 'yellow', 'red'], true))
+            ->sortBy([
+                ['warning_level', 'desc'],
+                ['annual_deduction', 'desc'],
+            ])
+            ->groupBy('warning_level');
 
-        $yellowWarningPeople = $autoWarningPeople
-            ->where('warning_level', 'yellow')
-            ->values();
-
-        $profileCount = $this->archiveProfileCount($user);
+        $selectedSummary = is_string($selectedStaffNo) && $selectedStaffNo !== ''
+            ? $this->scoreService->summary($selectedStaffNo, $year)
+            : null;
 
         return Inertia::render('Ethics/Dashboard', [
             'stats' => [
                 'year' => $year,
                 'selectedStaffNo' => $selectedStaffNo,
-                'profileCount' => $profileCount,
+                'profileCount' => $this->archiveProfileCount($user),
                 'openWarningCount' => (clone $warningQuery)->where('status', '!=', 'closed')->count(),
-                'politicalViolationCount' => (clone $politicalViolationQuery)->count(),
-                'politicalSelectedDeductionTotal' => round($politicalSelectedDeductionTotal, 2),
-                'politicalSelectedRemainingScore' => max(0, round(25 - $politicalSelectedDeductionTotal, 2)),
-                'educationViolationCount' => (clone $educationViolationQuery)->count(),
-                'educationSelectedDeductionTotal' => round($educationSelectedDeductionTotal, 2),
-                'educationSelectedRemainingScore' => max(0, round(25 - $educationSelectedDeductionTotal, 2)),
-                'academicViolationCount' => (clone $academicViolationQuery)->count(),
-                'academicSelectedDeductionTotal' => round($academicSelectedDeductionTotal, 2),
-                'academicSelectedRemainingScore' => max(0, round(25 - $academicSelectedDeductionTotal, 2)),
-                'professionalViolationCount' => (clone $professionalViolationQuery)->count(),
-                'professionalSelectedDeductionTotal' => round($professionalSelectedDeductionTotal, 2),
-                'professionalSelectedRemainingScore' => max(0, round(25 - $professionalSelectedDeductionTotal, 2)),
-                'redWarningPersonCount' => $redWarningPeople->count(),
-                'yellowWarningPersonCount' => $yellowWarningPeople->count(),
+                'politicalViolationCount' => (clone $violationQueries['political'])->count(),
+                'educationViolationCount' => (clone $violationQueries['education'])->count(),
+                'academicViolationCount' => (clone $violationQueries['academic'])->count(),
+                'professionalViolationCount' => (clone $violationQueries['professional'])->count(),
+                'disciplineViolationCount' => (clone $violationQueries['discipline'])->count(),
+                'selectedSummary' => $selectedSummary,
+                'politicalSelectedDeductionTotal' => $selectedSummary['deductions']['political'] ?? 0,
+                'politicalSelectedRemainingScore' => $selectedSummary['modules']['political'] ?? 20,
+                'educationSelectedDeductionTotal' => $selectedSummary['deductions']['education'] ?? 0,
+                'educationSelectedRemainingScore' => $selectedSummary['modules']['education'] ?? 20,
+                'academicSelectedDeductionTotal' => $selectedSummary['deductions']['academic'] ?? 0,
+                'academicSelectedRemainingScore' => $selectedSummary['modules']['academic'] ?? 20,
+                'professionalSelectedDeductionTotal' => $selectedSummary['deductions']['professional'] ?? 0,
+                'professionalSelectedRemainingScore' => $selectedSummary['modules']['professional'] ?? 20,
+                'disciplineSelectedDeductionTotal' => $selectedSummary['deductions']['discipline'] ?? 0,
+                'disciplineSelectedRemainingScore' => $selectedSummary['modules']['discipline'] ?? 20,
+                'redWarningPersonCount' => ($autoWarningPeople->get('red') ?? collect())->count(),
+                'yellowWarningPersonCount' => ($autoWarningPeople->get('yellow') ?? collect())->count(),
+                'blueWarningPersonCount' => ($autoWarningPeople->get('blue') ?? collect())->count(),
             ],
+            'dimensions' => EthicsScoreService::DIMENSIONS,
             'autoWarningPeople' => [
-                'red' => $redWarningPeople,
-                'yellow' => $yellowWarningPeople,
+                'red' => ($autoWarningPeople->get('red') ?? collect())->values(),
+                'yellow' => ($autoWarningPeople->get('yellow') ?? collect())->values(),
+                'blue' => ($autoWarningPeople->get('blue') ?? collect())->values(),
             ],
             'recentWarnings' => (clone $warningQuery)
                 ->with(['profile.user:id,name'])
@@ -215,6 +123,49 @@ class EthicsDashboardController extends Controller
                 ->limit(10)
                 ->get(),
         ]);
+    }
+
+    /**
+     * @return array<string, Builder>
+     */
+    private function scopedViolationQueries($user, int $year): array
+    {
+        $queries = [
+            'political' => EthicsPoliticalViolation::query()->whereYear('violation_at', $year),
+            'education' => EthicsEducationViolation::query()->forAnnualYear($year),
+            'academic' => EthicsAcademicViolation::query()->whereYear('violation_at', $year),
+            'professional' => EthicsProfessionalViolation::query()->whereYear('violation_at', $year),
+            'discipline' => EthicsDisciplineViolation::query()->whereYear('violation_at', $year),
+        ];
+
+        foreach ($queries as $query) {
+            if ($user->role === 'leader') {
+                $query->whereHas('profile', function (Builder $builder) use ($user): void {
+                    $builder->where('department_id', $user->department_id);
+                });
+            }
+
+            if ($user->role === 'advisor') {
+                $query->where('violator_user_id', $user->id);
+            }
+        }
+
+        return $queries;
+    }
+
+    /**
+     * @param array<string, Builder> $queries
+     * @return array<int, string>
+     */
+    private function staffNosFromQueries(array $queries): array
+    {
+        return collect($queries)
+            ->flatMap(fn (Builder $query) => (clone $query)->distinct()->pluck('staff_no'))
+            ->map(fn (mixed $staffNo): string => (string) $staffNo)
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     private function archiveProfileCount($user): int

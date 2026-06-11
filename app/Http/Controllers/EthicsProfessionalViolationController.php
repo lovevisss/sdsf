@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Actions\Ethics\UpsertAnnualDeductionWarning;
+use App\Http\Controllers\Concerns\StoresEthicsViolation;
 use App\Http\Requests\StoreEthicsProfessionalViolationRequest;
 use App\Models\EthicsProfessionalViolation;
 use App\Models\EthicsProfile;
@@ -15,7 +16,9 @@ use Inertia\Response;
 
 class EthicsProfessionalViolationController extends Controller
 {
-    private const MAX_PROFESSIONAL_SCORE = 25.0;
+    use StoresEthicsViolation;
+
+    private const MAX_PROFESSIONAL_SCORE = 20.0;
 
     public function __construct(private readonly UpsertAnnualDeductionWarning $upsertAnnualDeductionWarning)
     {
@@ -118,7 +121,7 @@ class EthicsProfessionalViolationController extends Controller
     {
         $this->authorize('create', EthicsProfessionalViolation::class);
 
-        $validated = $request->validated();
+        $validated = $this->prepareViolationPayload($request->validated(), $request);
         $profile = EthicsProfile::query()->where('staff_no', $validated['staff_no'])->first();
 
         EthicsProfessionalViolation::query()->create([

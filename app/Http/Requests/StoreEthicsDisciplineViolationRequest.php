@@ -6,7 +6,7 @@ use App\Models\Staff;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
-class StoreEthicsProfessionalViolationRequest extends FormRequest
+class StoreEthicsDisciplineViolationRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -19,7 +19,7 @@ class StoreEthicsProfessionalViolationRequest extends FormRequest
             'staff_no' => ['required', 'string', 'max:50'],
             'staff_name' => ['required', 'string', 'max:100'],
             'staff_unit_name' => ['nullable', 'string', 'max:255'],
-            'violation_type' => ['required', 'integer', 'between:23,34'],
+            'violation_type' => ['required', 'integer', 'between:35,39'],
             'severity_level' => ['nullable', 'string', 'in:A,B,C,a,b,c'],
             'violation_at' => ['required', 'date'],
             'deduction_points' => ['nullable', 'numeric', 'min:0.01', 'max:20'],
@@ -36,7 +36,10 @@ class StoreEthicsProfessionalViolationRequest extends FormRequest
     {
         $validator->after(function (Validator $validator): void {
             $this->validateStaff($validator);
-            $this->validateDeductionInput($validator);
+
+            if (! $this->filled('severity_level') && ! $this->filled('deduction_points')) {
+                $validator->errors()->add('severity_level', '请选择违规等级或填写扣分值。');
+            }
         });
     }
 
@@ -61,13 +64,6 @@ class StoreEthicsProfessionalViolationRequest extends FormRequest
 
         if ($this->filled('staff_name') && $this->input('staff_name') !== $staff->xm) {
             $validator->errors()->add('staff_name', '姓名与工号不匹配。');
-        }
-    }
-
-    private function validateDeductionInput(Validator $validator): void
-    {
-        if (! $this->filled('severity_level') && ! $this->filled('deduction_points')) {
-            $validator->errors()->add('severity_level', '请选择违规等级或填写扣分值。');
         }
     }
 }
