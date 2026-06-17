@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import NavFooter from '@/components/NavFooter.vue';
 import NavMain from '@/components/NavMain.vue';
 import NavUser from '@/components/NavUser.vue';
 import {
@@ -14,12 +13,19 @@ import {
 import { dashboard } from '@/routes';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/vue3';
-import { BookOpen, ClipboardList, FileDown, Folder, Gauge, LayoutGrid, ShieldAlert, UserRoundSearch } from 'lucide-vue-next';
-import AppLogo from './AppLogo.vue';
+import {
+    ClipboardList,
+    FileDown,
+    Gauge,
+    LayoutGrid,
+    ShieldAlert,
+    ShieldCheck,
+    UserRoundSearch,
+} from 'lucide-vue-next';
 
 const mainNavItems: NavItem[] = [
     {
-        title: 'Dashboard',
+        title: '工作台',
         href: dashboard(),
         icon: LayoutGrid,
     },
@@ -49,29 +55,41 @@ const mainNavItems: NavItem[] = [
         icon: FileDown,
     },
 ];
-
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Github Repo',
-        href: 'https://github.com/laravel/vue-starter-kit',
-        icon: Folder,
-    },
-    {
-        title: 'Documentation',
-        href: 'https://laravel.com/docs/starter-kits#vue',
-        icon: BookOpen,
-    },
-];
 </script>
 
 <template>
     <Sidebar collapsible="icon" variant="inset">
-        <SidebarHeader>
+        <SidebarHeader class="px-3 pt-3 pb-2">
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <SidebarMenuButton size="lg" as-child>
-                        <Link :href="dashboard()">
-<!--                            <AppLogo />-->
+                    <SidebarMenuButton
+                        size="lg"
+                        as-child
+                        class="h-12 rounded-lg px-2 transition hover:bg-slate-100 data-[active=true]:bg-slate-100"
+                    >
+                        <Link
+                            :href="dashboard()"
+                            aria-label="师德监督预警工作台"
+                        >
+                            <span
+                                class="flex size-8 shrink-0 items-center justify-center rounded-md bg-slate-950 text-white shadow-sm"
+                            >
+                                <ShieldCheck class="size-4" />
+                            </span>
+                            <span
+                                class="min-w-0 leading-tight group-data-[collapsible=icon]:hidden"
+                            >
+                                <span
+                                    class="block truncate text-sm font-semibold text-slate-950"
+                                >
+                                    师德监督
+                                </span>
+                                <span
+                                    class="block truncate text-xs font-medium text-slate-500"
+                                >
+                                    预警工作台
+                                </span>
+                            </span>
                         </Link>
                     </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -83,7 +101,6 @@ const footerNavItems: NavItem[] = [
         </SidebarContent>
 
         <SidebarFooter>
-<!--            <NavFooter :items="footerNavItems" />-->
             <NavUser />
         </SidebarFooter>
     </Sidebar>
