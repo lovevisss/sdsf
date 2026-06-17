@@ -11,6 +11,19 @@
           <Link href="/ethics/dashboard" class="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700">返回治理中心</Link>
         </div>
 
+        <div class="flex flex-wrap gap-2">
+          <button type="button" :disabled="syncForm.processing" class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-700 disabled:opacity-60" @click="syncAttendance">
+            {{ syncForm.processing ? '同步中...' : '同步月度考勤' }}
+          </button>
+        </div>
+
+        <div v-if="flash.success" class="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/30 dark:text-emerald-300">
+          {{ flash.success }}
+        </div>
+        <div v-if="flash.error" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-700 dark:bg-red-950/30 dark:text-red-300">
+          {{ flash.error }}
+        </div>
+
         <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Metric label="当前人员年度记录数" :value="selectedSummary?.violation_count ?? 0" />
           <Metric label="当前人员年度扣分" :value="selectedSummary?.total_deduction ?? 0" tone="red" />
@@ -119,7 +132,7 @@
 
 <script setup lang="ts">
 import AppLayout from '@/layouts/AppLayout.vue'
-import { Head, Link, router, useForm } from '@inertiajs/vue3'
+import { Head, Link, router, useForm, usePage } from '@inertiajs/vue3'
 import { computed, defineComponent, h, ref } from 'vue'
 
 type ProfileOption = { staff_no: string; name?: string; unit_name?: string }
@@ -145,12 +158,21 @@ type StaffSummary = {
 
 const props = defineProps<{
   records: { data: ViolationRecord[] }
+  year: number
   staffOptions: ProfileOption[]
   selectedStaffNo?: string | null
   selectedStaffSummary?: StaffSummary | null
   staffSummaries: StaffSummary[]
   violationTypeOptions: Record<string, string>
 }>()
+
+const page = usePage<{
+  flash?: {
+    success?: string | null
+    error?: string | null
+  }
+}>()
+const flash = computed(() => page.props.flash ?? {})
 
 const Metric = defineComponent({
   props: {
@@ -183,6 +205,10 @@ const form = useForm({
   notes: '',
 })
 
+const syncForm = useForm({
+  year: props.year,
+})
+
 const filteredStaffOptions = computed(() => {
   const keyword = staffQuery.value.trim().toLowerCase()
   if (!keyword) return props.staffOptions
@@ -196,6 +222,11 @@ const submit = (): void => {
   }
 
   form.post('/ethics/discipline-violations', { preserveScroll: true })
+}
+
+const syncAttendance = (): void => {
+  syncForm.year = props.year
+  syncForm.post('/ethics/discipline-violations/sync-attendance', { preserveScroll: true })
 }
 
 const selectStaff = (item: ProfileOption): void => {

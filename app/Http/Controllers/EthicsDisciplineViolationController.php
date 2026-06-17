@@ -8,6 +8,7 @@ use App\Http\Requests\StoreEthicsDisciplineViolationRequest;
 use App\Models\EthicsDisciplineViolation;
 use App\Models\EthicsProfile;
 use App\Models\Staff;
+use App\Services\Ethics\StaffMonthlyAttendanceSyncService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -20,7 +21,10 @@ class EthicsDisciplineViolationController extends Controller
 
     private const MAX_DISCIPLINE_SCORE = 20.0;
 
-    public function __construct(private readonly UpsertAnnualDeductionWarning $upsertAnnualDeductionWarning)
+    public function __construct(
+        private readonly UpsertAnnualDeductionWarning $upsertAnnualDeductionWarning,
+        private readonly StaffMonthlyAttendanceSyncService $attendanceSyncService,
+    )
     {
     }
 
@@ -117,6 +121,43 @@ class EthicsDisciplineViolationController extends Controller
         return redirect()->route('ethics.discipline-violations.index', [
             'staff_no' => $validated['staff_no'],
         ])->with('success', '工作纪律违规记录已保存。');
+    }
+
+    public function syncAttendance(Request $request)
+    {
+        $this->authorize('create', EthicsDisciplineViolation::class);
+
+        $validated = $request->validate([
+            'year' => ['nullable', 'integer', 'min:1900', 'max:9999'],
+            'stat_month' => ['nullable', 'date_format:Y-m'],
+        ]);
+
+        try {
+            $result = $this->attendanceSyncService->sync(
+                statMonth: $validated['stat_month'] ?? null,
+                year: isset($validated['year']) ? (int) $validated['year'] : now()->year,
+                recorderUserId: $request->user()->id,
+            );
+        } catch (\Throwable $exception) {
+            Log::warning('Failed to sync staff monthly attendance into ethics discipline violations.', [
+                'message' => $exception->getMessage(),
+            ]);
+
+            return redirect()->route('ethics.discipline-violations.index', [
+                'year' => $validated['year'] ?? now()->year,
+            ])->with('error', '月度考勤同步失败：'.$exception->getMessage());
+        }
+
+        return redirect()->route('ethics.discipline-violations.index', [
+            'year' => $validated['year'] ?? now()->year,
+        ])->with('attendanceSync', $result)
+            ->with('success', sprintf(
+                '月度考勤同步完成：读取 %d 条，新增 %d 条，跳过 %d 条，未达阈值 %d 条。',
+                $result['read'],
+                $result['inserted'],
+                $result['skipped'],
+                $result['below_threshold'],
+            ));
     }
 
     /**

@@ -2,6 +2,13 @@
 
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
+use App\Models\EthicsAcademicViolation;
+use App\Models\EthicsDisciplineViolation;
+use App\Models\EthicsEducationViolation;
+use App\Models\EthicsPoliticalViolation;
+use App\Models\EthicsProfessionalViolation;
+use App\Models\EthicsProfile;
+use App\Models\EthicsWarning;
 use App\Http\Controllers\ScoreController;
 use App\Http\Controllers\ViolationController;
 use App\Http\Controllers\AlertController;
@@ -49,7 +56,29 @@ Route::get('projects/create', [App\Http\Controllers\ProjectController::class, 'c
 Route::post('/projects', [App\Http\Controllers\ProjectController::class, 'store'])->name('projects.store');
 
 Route::get('dashboard', function () {
-    return Inertia::render('Dashboard');
+    $openWarningQuery = EthicsWarning::query()->where('status', '!=', 'closed');
+
+    $violationCounts = [
+        'political' => EthicsPoliticalViolation::query()->count(),
+        'education' => EthicsEducationViolation::query()->count(),
+        'academic' => EthicsAcademicViolation::query()->count(),
+        'professional' => EthicsProfessionalViolation::query()->count(),
+        'discipline' => EthicsDisciplineViolation::query()->count(),
+    ];
+
+    return Inertia::render('Dashboard', [
+        'summary' => [
+            'profileCount' => EthicsProfile::query()->count(),
+            'openWarningCount' => (clone $openWarningQuery)->count(),
+            'warningLevels' => [
+                'blue' => (clone $openWarningQuery)->where('warning_level', 'blue')->count(),
+                'yellow' => (clone $openWarningQuery)->where('warning_level', 'yellow')->count(),
+                'red' => (clone $openWarningQuery)->where('warning_level', 'red')->count(),
+            ],
+            'violations' => $violationCounts,
+            'totalViolationCount' => array_sum($violationCounts),
+        ],
+    ]);
 })->middleware(['auth', 'verified'])->name('dashboard');
 
 Route::post('/admin/coupons', [\App\Http\Controllers\CouponController::class,'store'])->middleware('admin');
@@ -123,6 +152,8 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/ethics/discipline-violations', [\App\Http\Controllers\EthicsDisciplineViolationController::class, 'index'])
         ->name('ethics.discipline-violations.index');
+    Route::post('/ethics/discipline-violations/sync-attendance', [\App\Http\Controllers\EthicsDisciplineViolationController::class, 'syncAttendance'])
+        ->name('ethics.discipline-violations.sync-attendance');
     Route::post('/ethics/discipline-violations', [\App\Http\Controllers\EthicsDisciplineViolationController::class, 'store'])
         ->name('ethics.discipline-violations.store');
 
