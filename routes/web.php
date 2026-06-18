@@ -87,11 +87,80 @@ Route::get('dashboard', function () {
         ->unique()
         ->values();
 
-    $computedWarningLevels = app(EthicsScoreService::class)
+    $profilesByStaffNo = EthicsProfile::query()
+        ->with(['user:id,name', 'department:id,name'])
+        ->whereIn('staff_no', $staffNos)
+        ->get()
+        ->keyBy('staff_no');
+
+    $staffFallbacks = collect($annualViolationQueries)
+        ->flatMap(fn ($query) => (clone $query)
+            ->whereIn('staff_no', $staffNos)
+            ->select(['staff_no', 'staff_name', 'staff_unit_name'])
+            ->get()
+            ->map(fn ($row): array => [
+                'staff_no' => (string) $row->staff_no,
+                'name' => $row->staff_name,
+                'unit_name' => $row->staff_unit_name,
+            ]))
+        ->filter(fn (array $row): bool => $row['staff_no'] !== '')
+        ->groupBy('staff_no')
+        ->map(fn ($rows): array => [
+            'name' => $rows->pluck('name')->filter()->first(),
+            'unit_name' => $rows->pluck('unit_name')->filter()->first(),
+        ]);
+
+    $computedWarningPeople = app(EthicsScoreService::class)
         ->summariesForStaffNos($staffNos, $year)
-        ->pluck('summary.warningLevel')
-        ->filter(fn ($level): bool => in_array($level, ['blue', 'yellow', 'red'], true))
-        ->countBy();
+        ->map(function (array $item) use ($profilesByStaffNo, $staffFallbacks, $year): array {
+            $staffNo = $item['staff_no'];
+            $summary = $item['summary'];
+            $profile = $profilesByStaffNo->get($staffNo);
+            $fallback = $staffFallbacks->get($staffNo, []);
+
+            return [
+                'staff_no' => $staffNo,
+                'name' => $profile?->user?->name ?? ($fallback['name'] ?? null),
+                'unit_name' => $profile?->department?->name ?? ($fallback['unit_name'] ?? null),
+                'warning_level' => $summary['warningLevel'],
+                'annual_deduction' => $summary['totalDeduction'],
+                'total_score' => $summary['totalScore'],
+                'profile_url' => route('ethics.profiles.staff.show', ['staffNo' => $staffNo, 'year' => $year, 'from' => 'dashboard']),
+            ];
+        })
+        ->filter(fn (array $item): bool => in_array($item['warning_level'], ['blue', 'yellow', 'red'], true))
+        ->sortBy([
+            ['warning_level', 'desc'],
+            ['annual_deduction', 'desc'],
+        ])
+        ->groupBy('warning_level');
+
+    $computedWarningLevels = $computedWarningPeople
+        ->map(fn ($people): int => $people->count());
+
+    $databaseWarningPeople = (clone $openWarningQuery)
+        ->with(['profile.user:id,name', 'profile.department:id,name'])
+        ->whereIn('warning_level', ['blue', 'yellow', 'red'])
+        ->latest('detected_at')
+        ->get()
+        ->map(function (EthicsWarning $warning) use ($year): array {
+            $profile = $warning->profile;
+            $staffNo = (string) ($profile?->staff_no ?? '');
+
+            return [
+                'staff_no' => $staffNo,
+                'name' => $profile?->user?->name,
+                'unit_name' => $profile?->department?->name,
+                'warning_level' => $warning->warning_level,
+                'annual_deduction' => null,
+                'total_score' => null,
+                'profile_url' => $staffNo !== ''
+                    ? route('ethics.profiles.staff.show', ['staffNo' => $staffNo, 'year' => $year, 'from' => 'dashboard'])
+                    : null,
+            ];
+        })
+        ->filter(fn (array $item): bool => in_array($item['warning_level'], ['blue', 'yellow', 'red'], true))
+        ->groupBy('warning_level');
 
     $computedWarningCount = (int) $computedWarningLevels->sum();
     $databaseWarningLevels = [
@@ -113,6 +182,11 @@ Route::get('dashboard', function () {
             'profileCount' => EthicsProfile::query()->count(),
             'openWarningCount' => $computedWarningCount > 0 ? $computedWarningCount : (clone $openWarningQuery)->count(),
             'warningLevels' => $warningLevels,
+            'warningPeople' => [
+                'blue' => ($computedWarningCount > 0 ? $computedWarningPeople : $databaseWarningPeople)->get('blue', collect())->values(),
+                'yellow' => ($computedWarningCount > 0 ? $computedWarningPeople : $databaseWarningPeople)->get('yellow', collect())->values(),
+                'red' => ($computedWarningCount > 0 ? $computedWarningPeople : $databaseWarningPeople)->get('red', collect())->values(),
+            ],
             'violations' => $violationCounts,
             'totalViolationCount' => array_sum($violationCounts),
         ],

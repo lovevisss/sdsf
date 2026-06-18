@@ -82,25 +82,27 @@ class DashboardTest extends TestCase
         $user = User::factory()->create();
         $this->actingAs($user);
 
-        $blueProfile = EthicsProfile::factory()->create(['staff_no' => 'WARN-BLUE']);
-        $yellowProfile = EthicsProfile::factory()->create(['staff_no' => 'WARN-YELLOW']);
-        $redProfile = EthicsProfile::factory()->create(['staff_no' => 'WARN-RED']);
-
         EthicsPoliticalViolation::factory()->create([
-            'ethics_profile_id' => $blueProfile->id,
-            'staff_no' => $blueProfile->staff_no,
+            'ethics_profile_id' => null,
+            'staff_no' => 'WARN-BLUE',
+            'staff_name' => '蓝色预警老师',
+            'staff_unit_name' => '测试学院',
             'violation_at' => now(),
             'deduction_points' => 5,
         ]);
         EthicsPoliticalViolation::factory()->create([
-            'ethics_profile_id' => $yellowProfile->id,
-            'staff_no' => $yellowProfile->staff_no,
+            'ethics_profile_id' => null,
+            'staff_no' => 'WARN-YELLOW',
+            'staff_name' => '黄色预警老师',
+            'staff_unit_name' => '测试学院',
             'violation_at' => now(),
             'deduction_points' => 10,
         ]);
         EthicsPoliticalViolation::factory()->create([
-            'ethics_profile_id' => $redProfile->id,
-            'staff_no' => $redProfile->staff_no,
+            'ethics_profile_id' => null,
+            'staff_no' => 'WARN-RED',
+            'staff_name' => '红色预警老师',
+            'staff_unit_name' => '测试学院',
             'violation_at' => now(),
             'deduction_points' => 20,
         ]);
@@ -114,6 +116,55 @@ class DashboardTest extends TestCase
             ->where('summary.warningLevels.blue', 1)
             ->where('summary.warningLevels.yellow', 1)
             ->where('summary.warningLevels.red', 1)
+            ->where('summary.warningPeople.blue.0.staff_no', 'WARN-BLUE')
+            ->where('summary.warningPeople.blue.0.name', '蓝色预警老师')
+            ->where('summary.warningPeople.blue.0.unit_name', '测试学院')
+            ->where('summary.warningPeople.yellow.0.staff_no', 'WARN-YELLOW')
+            ->where('summary.warningPeople.yellow.0.name', '黄色预警老师')
+            ->where('summary.warningPeople.blue.0.profile_url', route('ethics.profiles.staff.show', [
+                'staffNo' => 'WARN-BLUE',
+                'year' => now()->year,
+                'from' => 'dashboard',
+            ]))
+            ->where('summary.warningPeople.yellow.0.profile_url', route('ethics.profiles.staff.show', [
+                'staffNo' => 'WARN-YELLOW',
+                'year' => now()->year,
+                'from' => 'dashboard',
+            ]))
+        );
+    }
+
+    public function test_profile_opened_from_dashboard_returns_to_workbench_and_uses_violation_identity(): void
+    {
+        $user = User::factory()->create([
+            'role' => 'admin',
+            'is_admin' => true,
+        ]);
+        $this->actingAs($user);
+
+        EthicsPoliticalViolation::factory()->create([
+            'ethics_profile_id' => null,
+            'staff_no' => 'UNBOUND-01',
+            'staff_name' => '未绑定测试老师',
+            'staff_unit_name' => '测试单位',
+            'violation_at' => now(),
+            'deduction_points' => 5,
+        ]);
+
+        $response = $this->get(route('ethics.profiles.staff.show', [
+            'staffNo' => 'UNBOUND-01',
+            'year' => now()->year,
+            'from' => 'dashboard',
+        ]));
+
+        $response->assertOk();
+        $response->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Ethics/Profiles/Show')
+            ->where('profile.staff_no', 'UNBOUND-01')
+            ->where('profile.name', '未绑定测试老师')
+            ->where('profile.unit_name', '测试单位')
+            ->where('returnTo.url', route('dashboard'))
+            ->where('returnTo.label', '返回工作台')
         );
     }
 }

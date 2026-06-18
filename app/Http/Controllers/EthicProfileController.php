@@ -282,6 +282,11 @@ class EthicProfileController extends Controller
 
         $year = (int) $request->query('year', now()->year);
         $staff = null;
+        $profile = EthicsProfile::query()
+            ->with(['user:id,name', 'department:id,name'])
+            ->where('staff_no', $staffNo)
+            ->first();
+        $violationIdentity = $this->violationIdentityForStaffNo($staffNo);
 
         try {
             $staff = Staff::query()->find($staffNo);
@@ -445,19 +450,54 @@ class EthicProfileController extends Controller
 
         $currentYearSummary = $buildSummary($year);
         $deductionRecords = $this->buildDeductionRecords($staffNo);
+        $returnTo = $request->query('from') === 'dashboard'
+            ? ['url' => route('dashboard'), 'label' => '返回工作台']
+            : ['url' => route('ethics.profiles.index'), 'label' => '返回列表'];
 
         return Inertia::render('Ethics/Profiles/Show', [
             'profile' => [
                 'staff_no' => $staffNo,
-                'name' => $staff?->name,
-                'unit_name' => $staff?->unit_name,
+                'name' => $staff?->name ?? $profile?->user?->name ?? $violationIdentity['name'],
+                'unit_name' => $staff?->unit_name ?? $profile?->department?->name ?? $violationIdentity['unit_name'],
             ],
             'summary' => [
                 ...$currentYearSummary,
             ],
             'yearlySummaries' => $yearlySummaries,
             'deductionRecords' => $deductionRecords,
+            'returnTo' => $returnTo,
         ]);
+    }
+
+    /**
+     * @return array{name: string|null, unit_name: string|null}
+     */
+    private function violationIdentityForStaffNo(string $staffNo): array
+    {
+        $latestRecord = collect([
+            EthicsPoliticalViolation::class,
+            EthicsEducationViolation::class,
+            EthicsAcademicViolation::class,
+            EthicsProfessionalViolation::class,
+            EthicsDisciplineViolation::class,
+        ])
+            ->map(fn (string $modelClass) => $modelClass::query()
+                ->where('staff_no', $staffNo)
+                ->select(['staff_name', 'staff_unit_name', 'violation_at'])
+                ->latest('violation_at')
+                ->first())
+            ->filter()
+            ->sortByDesc(function ($row): int {
+                $timestamp = strtotime((string) $row->violation_at);
+
+                return $timestamp !== false ? $timestamp : 0;
+            })
+            ->first();
+
+        return [
+            'name' => $latestRecord?->staff_name,
+            'unit_name' => $latestRecord?->staff_unit_name,
+        ];
     }
 
     /**
