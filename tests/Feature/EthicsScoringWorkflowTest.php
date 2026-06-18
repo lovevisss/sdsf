@@ -124,7 +124,7 @@ class EthicsScoringWorkflowTest extends TestCase
             'staff_name' => 'Teacher Discipline',
             'staff_unit_name' => 'Test Department',
             'violation_type' => 35,
-            'severity_level' => 'A',
+            'deduction_points' => 3.5,
             'violation_at' => '2026-05-01 10:00:00',
             'deduction_basis' => '考勤异常月度汇总',
         ])->assertRedirect('/ethics/discipline-violations?staff_no=DISC-01');
@@ -132,7 +132,7 @@ class EthicsScoringWorkflowTest extends TestCase
         $this->assertDatabaseHas('ethics_discipline_violations', [
             'ethics_profile_id' => $profile->id,
             'staff_no' => 'DISC-01',
-            'deduction_points' => 5,
+            'deduction_points' => 3.5,
         ]);
 
         $this->actingAs($leader)
@@ -140,7 +140,7 @@ class EthicsScoringWorkflowTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('Ethics/Profiles/Show')
-                ->where('summary.modules.discipline', 15)
+                ->where('summary.modules.discipline', 16.5)
                 ->where('deductionRecords.0.module_key', 'discipline')
             );
     }

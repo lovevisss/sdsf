@@ -38,7 +38,7 @@ class StoreEthicsDisciplineViolationRequest extends FormRequest
             $this->validateStaff($validator);
 
             if (! $this->filled('severity_level') && ! $this->filled('deduction_points')) {
-                $validator->errors()->add('severity_level', '请选择违规等级或填写扣分值。');
+                $validator->errors()->add('deduction_points', '请填写扣分值。');
             }
         });
     }
