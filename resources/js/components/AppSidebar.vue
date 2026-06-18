@@ -18,7 +18,6 @@ import {
     FileDown,
     Gauge,
     LayoutGrid,
-    ShieldAlert,
     ShieldCheck,
     UserRoundSearch,
 } from 'lucide-vue-next';
@@ -38,11 +37,6 @@ const mainNavItems: NavItem[] = [
         title: '师德档案',
         href: '/ethics/profiles',
         icon: UserRoundSearch,
-    },
-    {
-        title: '工作纪律录入',
-        href: '/ethics/discipline-violations',
-        icon: ShieldAlert,
     },
     {
         title: '投诉处置',

@@ -51,10 +51,14 @@ class DashboardTest extends TestCase
         EthicsPoliticalViolation::factory()->create([
             'ethics_profile_id' => $profile->id,
             'staff_no' => $profile->staff_no,
+            'violation_at' => now(),
+            'deduction_points' => 1,
         ]);
         EthicsDisciplineViolation::factory()->create([
             'ethics_profile_id' => $profile->id,
             'staff_no' => $profile->staff_no,
+            'violation_at' => now(),
+            'deduction_points' => 1,
         ]);
 
         $response = $this->get(route('dashboard'));
@@ -70,6 +74,46 @@ class DashboardTest extends TestCase
             ->where('summary.violations.political', 1)
             ->where('summary.violations.discipline', 1)
             ->where('summary.totalViolationCount', 2)
+        );
+    }
+
+    public function test_dashboard_warning_counts_include_computed_score_warnings(): void
+    {
+        $user = User::factory()->create();
+        $this->actingAs($user);
+
+        $blueProfile = EthicsProfile::factory()->create(['staff_no' => 'WARN-BLUE']);
+        $yellowProfile = EthicsProfile::factory()->create(['staff_no' => 'WARN-YELLOW']);
+        $redProfile = EthicsProfile::factory()->create(['staff_no' => 'WARN-RED']);
+
+        EthicsPoliticalViolation::factory()->create([
+            'ethics_profile_id' => $blueProfile->id,
+            'staff_no' => $blueProfile->staff_no,
+            'violation_at' => now(),
+            'deduction_points' => 5,
+        ]);
+        EthicsPoliticalViolation::factory()->create([
+            'ethics_profile_id' => $yellowProfile->id,
+            'staff_no' => $yellowProfile->staff_no,
+            'violation_at' => now(),
+            'deduction_points' => 10,
+        ]);
+        EthicsPoliticalViolation::factory()->create([
+            'ethics_profile_id' => $redProfile->id,
+            'staff_no' => $redProfile->staff_no,
+            'violation_at' => now(),
+            'deduction_points' => 20,
+        ]);
+
+        $response = $this->get(route('dashboard'));
+
+        $response->assertOk();
+        $response->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Dashboard')
+            ->where('summary.openWarningCount', 3)
+            ->where('summary.warningLevels.blue', 1)
+            ->where('summary.warningLevels.yellow', 1)
+            ->where('summary.warningLevels.red', 1)
         );
     }
 }

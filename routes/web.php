@@ -13,6 +13,7 @@ use App\Http\Controllers\ScoreController;
 use App\Http\Controllers\ViolationController;
 use App\Http\Controllers\AlertController;
 use App\Http\Controllers\CasController;
+use App\Services\Ethics\EthicsScoreService;
 use Laravel\Fortify\Features;
 
 Route::get('/', function () {
@@ -56,25 +57,62 @@ Route::get('projects/create', [App\Http\Controllers\ProjectController::class, 'c
 Route::post('/projects', [App\Http\Controllers\ProjectController::class, 'store'])->name('projects.store');
 
 Route::get('dashboard', function () {
+    $year = now()->year;
     $openWarningQuery = EthicsWarning::query()->where('status', '!=', 'closed');
 
-    $violationCounts = [
-        'political' => EthicsPoliticalViolation::query()->count(),
-        'education' => EthicsEducationViolation::query()->count(),
-        'academic' => EthicsAcademicViolation::query()->count(),
-        'professional' => EthicsProfessionalViolation::query()->count(),
-        'discipline' => EthicsDisciplineViolation::query()->count(),
+    $violationQueries = [
+        'political' => EthicsPoliticalViolation::query(),
+        'education' => EthicsEducationViolation::query(),
+        'academic' => EthicsAcademicViolation::query(),
+        'professional' => EthicsProfessionalViolation::query(),
+        'discipline' => EthicsDisciplineViolation::query(),
     ];
+
+    $annualViolationQueries = [
+        'political' => EthicsPoliticalViolation::query()->whereYear('violation_at', $year),
+        'education' => EthicsEducationViolation::query()->forAnnualYear($year),
+        'academic' => EthicsAcademicViolation::query()->whereYear('violation_at', $year),
+        'professional' => EthicsProfessionalViolation::query()->whereYear('violation_at', $year),
+        'discipline' => EthicsDisciplineViolation::query()->whereYear('violation_at', $year),
+    ];
+
+    $violationCounts = collect($violationQueries)
+        ->map(fn ($query): int => (clone $query)->count())
+        ->all();
+
+    $staffNos = collect($annualViolationQueries)
+        ->flatMap(fn ($query) => (clone $query)->distinct()->pluck('staff_no'))
+        ->map(fn (mixed $staffNo): string => (string) $staffNo)
+        ->filter()
+        ->unique()
+        ->values();
+
+    $computedWarningLevels = app(EthicsScoreService::class)
+        ->summariesForStaffNos($staffNos, $year)
+        ->pluck('summary.warningLevel')
+        ->filter(fn ($level): bool => in_array($level, ['blue', 'yellow', 'red'], true))
+        ->countBy();
+
+    $computedWarningCount = (int) $computedWarningLevels->sum();
+    $databaseWarningLevels = [
+        'blue' => (clone $openWarningQuery)->where('warning_level', 'blue')->count(),
+        'yellow' => (clone $openWarningQuery)->where('warning_level', 'yellow')->count(),
+        'red' => (clone $openWarningQuery)->where('warning_level', 'red')->count(),
+    ];
+
+    $warningLevels = $computedWarningCount > 0
+        ? [
+            'blue' => (int) ($computedWarningLevels->get('blue') ?? 0),
+            'yellow' => (int) ($computedWarningLevels->get('yellow') ?? 0),
+            'red' => (int) ($computedWarningLevels->get('red') ?? 0),
+        ]
+        : $databaseWarningLevels;
 
     return Inertia::render('Dashboard', [
         'summary' => [
             'profileCount' => EthicsProfile::query()->count(),
-            'openWarningCount' => (clone $openWarningQuery)->count(),
-            'warningLevels' => [
-                'blue' => (clone $openWarningQuery)->where('warning_level', 'blue')->count(),
-                'yellow' => (clone $openWarningQuery)->where('warning_level', 'yellow')->count(),
-                'red' => (clone $openWarningQuery)->where('warning_level', 'red')->count(),
-            ],
+            'openWarningCount' => $computedWarningCount > 0 ? $computedWarningCount : (clone $openWarningQuery)->count(),
+            'warningLevels' => $warningLevels,
             'violations' => $violationCounts,
             'totalViolationCount' => array_sum($violationCounts),
         ],
